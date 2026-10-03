@@ -21,8 +21,10 @@ $env:LIB = "$($msvc.FullName)\lib\x64;$sdkRoot\Lib\$($sdk.Name)\ucrt\x64;$sdkRoo
 $env:LIBPATH = $env:LIB
 $env:PATH = "$($msvc.FullName)\bin\Hostx64\x64;$sdkRoot\bin\$($sdk.Name)\x64;$vsPath\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;$(Split-Path $cmake);$env:PATH"
 if (!(Get-Command ninja -ErrorAction SilentlyContinue)) { throw "Ninja is required." }
-if (!$JuceSource -and (Test-Path "I:\Organic Chemistry\cmake-build-release-visual-studio\_deps\juce-src\CMakeLists.txt")) {
-    $JuceSource = "I:\Organic Chemistry\cmake-build-release-visual-studio\_deps\juce-src"
+# 系列文件夹布局：JUCE 源码优先复用隔壁 Organic Chemistry 的 FetchContent 缓存。
+$defaultJuce = Join-Path (Split-Path $PSScriptRoot -Parent) "Organic Chemistry\cmake-build-release-visual-studio\_deps\juce-src"
+if (!$JuceSource -and (Test-Path "$defaultJuce\CMakeLists.txt")) {
+    $JuceSource = $defaultJuce
 }
 $configure = @("-S", $PSScriptRoot, "-B", $BuildDirectory, "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_C_COMPILER=cl", "-DCMAKE_CXX_COMPILER=cl", "-DENTROPY_BUILD_TESTS=ON", "-DENTROPY_COPY_PLUGIN_AFTER_BUILD=OFF")
 $configure += "-DENTROPY_BUILD_PLUGIN=$(if ($DspOnly) { 'OFF' } else { 'ON' })"

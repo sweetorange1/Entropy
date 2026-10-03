@@ -2,7 +2,7 @@
 
 > 面向作者、AI 助手和维护者：集中说明“现在做到了什么、参数叫什么、声音如何产生、下一步改哪里”。
 > 本文以当前源码为准，不把灵感文档里的目标功能当作已实现功能。
-> 对应版本：**1.0.0**；更新日期：**2026-10-03**；工程：`I:\Entropy`。
+> 对应版本：**1.0.0**；更新日期：**2026-10-03**；工程：`I:\理科系列\Entropy`。
 > 本版核心变化：物理化学公式层上线——时间轴标注 σ = dS/dt ≥ 0；右上角融合 Gibbs–Helmholtz 签名公式与随拖动实时计算的 ΔG = ΔH − T·ΔS（T = 298 K 室温锚点，ΔG 在熵 0.5 过零并显示 SPONTANEOUS）；模型视图标题 S = k ln W 与微观状态计数 W ≈ 10^23·S；卡片底部 Arrhenius 速率方程与每载体 Ea、t½（等于时间尺度）；SURFACE 行标注 dS ≥ δQ/T。常数见 `Source/Thermodynamics.h`（艺术标定，t½ 与 ΔG 过零点自洽）。
 > 后续提出需求时，推荐使用“**载体 + 参数字段 + 想要的听感/数值变化**”，例如“让 TAPE 的 `wowMs` 在熵 0.4 后才开始增加”。
 
@@ -528,9 +528,9 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 
 ### 9.1 Windows 构建入口
 
-在 PowerShell 中使用：`powershell -NoProfile -ExecutionPolicy Bypass -File "I:\Entropy\build.ps1"`。
+在 PowerShell 中使用：`powershell -NoProfile -ExecutionPolicy Bypass -File "I:\理科系列\Entropy\build.ps1"`。
 
-此脚本构建的是 **Entropy**，不要运行 `I:\Organic Chemistry\build.ps1` 来验证本项目。脚本调用 CMake 配置、Release 构建与 CTest，全部成功后打印 `BUILD_OK`。
+此脚本构建的是 **Entropy**，不要运行 `I:\理科系列\Organic Chemistry\build.ps1` 来验证本项目。脚本调用 CMake 配置、Release 构建与 CTest，全部成功后打印 `BUILD_OK`。
 
 | 脚本参数 | 默认/意义 |
 | --- | --- |
@@ -540,7 +540,7 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | `-DspOnly` | 关闭插件目标，只构建独立 DSP 与其测试；不执行 StateTests |
 
 - 自动发现 Visual Studio x64 C++ 工具链和 Windows SDK；需要 CMake 和 Ninja。
-- 未指定 JUCE 路径且本机存在参考工程源码时，复用 `I:\Organic Chemistry\cmake-build-release-visual-studio\_deps\juce-src`，通过 `FETCHCONTENT_SOURCE_DIR_JUCE` 指定；不复制或修改旧插件源码。
+- 未指定 JUCE 路径且本机存在参考工程源码时，复用系列文件夹内 `Organic Chemistry\cmake-build-release-visual-studio\_deps\juce-src`（相对 `build.ps1` 所在位置解析），通过 `FETCHCONTENT_SOURCE_DIR_JUCE` 指定；不复制或修改旧插件源码。
 - 没有本地源码覆盖时，CMake 按 `GIT_TAG 8.0.12` 获取 JUCE。指定本地路径会覆盖远端版本选择，迁移机器后需自行核对该源码版本。
 - CMake 开关：`ENTROPY_BUILD_PLUGIN=ON`、`ENTROPY_BUILD_TESTS=ON`、`ENTROPY_COPY_PLUGIN_AFTER_BUILD=OFF`；脚本固定开启测试、关闭安装，`-DspOnly` 控制插件开关。
 - Apple 配置声明 macOS 11.0 起、`x86_64;arm64` 架构；目前没有对应平台的成功构建验证记录。
@@ -549,11 +549,11 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 
 | 项目 | 路径 |
 | --- | --- |
-| VST3 bundle | `I:\Entropy\cmake-build-ninja\Entropy_artefacts\Release\VST3\Entropy.vst3` |
-| Standalone | `I:\Entropy\cmake-build-ninja\Entropy_artefacts\Release\Standalone\Entropy.exe` |
-| 构建日志 | `I:\Entropy\build.log` |
-| 测试记录 | `I:\Entropy\cmake-build-ninja\Testing\Temporary\LastTest.log` |
-| UI 快照 | `I:\Entropy\cmake-build-ninja\Entropy-preview.png`（StateTests 在工作目录生成） |
+| VST3 bundle | `I:\理科系列\Entropy\cmake-build-ninja\Entropy_artefacts\Release\VST3\Entropy.vst3` |
+| Standalone | `I:\理科系列\Entropy\cmake-build-ninja\Entropy_artefacts\Release\Standalone\Entropy.exe` |
+| 构建日志 | `I:\理科系列\Entropy\build.log` |
+| 测试记录 | `I:\理科系列\Entropy\cmake-build-ninja\Testing\Temporary\LastTest.log` |
+| UI 快照 | `I:\理科系列\Entropy\cmake-build-ninja\Entropy-preview.png`（StateTests 在工作目录生成） |
 
 开发构建不会自动安装插件；还没有安装器、签名、公证或自动更新发布流程。
 
