@@ -1,0 +1,13 @@
+/cmake-build-*/
+/build/
+/build.log
+/.vs/
+/.idea/
+/CMakeUserPresets.json
+/dist/
+/.pkg_staging/
+/.codebuddy/
+/.codewiki/
+*.user
+*.pdb
+*.entropypreset
