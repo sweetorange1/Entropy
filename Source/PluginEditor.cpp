@@ -10,6 +10,18 @@ juce::Font formulaFont(float size)
 {
     return juce::Font(juce::FontOptions(size).withStyle("Italic"));
 }
+
+// 预设簇固定宽度：所有预设名与 "Custom / Archive" 的最大宽度 + 26 内边距。
+// 名称区域不再随当前名称伸缩，左右箭头按钮因此保持不动，连续切换预设时
+// 点击位置稳定。仅在首次调用时计算一次（函数内 static 的 magic static）。
+float presetClusterWidth()
+{
+    const juce::Font font(juce::FontOptions(17.0f));
+    float w = juce::GlyphArrangement::getStringWidth(font, "Custom / Archive");
+    for (const auto& p : entropy::factoryPresets())
+        w = juce::jmax(w, juce::GlyphArrangement::getStringWidth(font, p.name));
+    return juce::jmax(84.0f, w + 26.0f);
+}
 }
 
 using entropy::ui::ink;
@@ -189,10 +201,9 @@ juce::Rectangle<float> EntropyAudioProcessorEditor::websiteBounds() const
 
 juce::Rectangle<float> EntropyAudioProcessorEditor::formulaBounds() const
 {
-    const int index = processor.matchingFactoryPreset();
-    const juce::String name = index >= 0 ? entropy::factoryPresets()[static_cast<size_t>(index)].name : "Custom / Archive";
-    const juce::Font font(juce::FontOptions(17.0f));
-    const float w = juce::jmax(84.0f, juce::GlyphArrangement::getStringWidth(font, name) + 26.0f);
+    // 宽度固定为「最长名称 + 内边距」，以 480 居中。prev/next 按钮紧贴此
+    // 固定区域两侧，切换预设时不再随名称长度移动。
+    static const float w = presetClusterWidth();
     return { 480.0f - w * 0.5f, 13.0f, w, 26.0f };
 }
 

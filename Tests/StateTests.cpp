@@ -268,12 +268,16 @@ void presetPanelTests()
         require(saveCalled && openCalled, "Snapshot actions were not preserved");
         clickEditor(480, 26); clickPanel(835, 294);
         require(!panel->isVisible(), "Close action failed");
-        const auto arrowX = [&](bool next)
+        // 箭头按钮位置与 PluginEditor::formulaBounds 的固定预设簇一致：
+        // 簇宽 = 最长名称（含 "Custom / Archive"）+ 26，以 480 居中，
+        // 按钮中心在簇两侧外 18 处，与当前预设名称长度无关。
+        const auto arrowX = [](bool next)
         {
-            const int index = processor.matchingFactoryPreset();
-            const juce::String name = entropy::factoryPresets()[static_cast<size_t>(index)].name;
             const juce::Font font(juce::FontOptions(17.0f));
-            const float w = juce::jmax(84.0f, juce::GlyphArrangement::getStringWidth(font, name) + 26.0f);
+            float w = juce::GlyphArrangement::getStringWidth(font, "Custom / Archive");
+            for (const auto& p : entropy::factoryPresets())
+                w = juce::jmax(w, juce::GlyphArrangement::getStringWidth(font, p.name));
+            w = juce::jmax(84.0f, w + 26.0f);
             return (480.0f - w * 0.5f) + (next ? w + 18.0f : -18.0f);
         };
         clickEditor(arrowX(false), 26);
