@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-2A2A28" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.0.4-2A2A28" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/framework-JUCE%208.0.12-orange" alt="JUCE">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License">
@@ -124,25 +124,10 @@ cmake --build cmake-build-release --config Release
 
 ## 打包 / Packaging
 
-### Windows（Inno Setup）
+本插件不再单独打包，随 **iisaacbeats Science Series** 系列安装包（同时包含 ChemE-Organic Chemistry / ChemE-Entropy / ChemE-Transcription 三款）统一分发。打包脚本位于工作区根目录：
 
-```bat
-# 需先完成 Release 构建，再运行：
-build_installer.bat
-```
-
-输出 `dist\Entropy_Setup_1.0.0_x64.exe`，安装到 `C:\Program Files\Common Files\VST3\iisaacbeats.cn`。
-
-### macOS（pkg + dmg）
-
-```bash
-chmod +x build_installer_mac.sh
-./build_installer_mac.sh              # 打包 pkg + dmg（未签名）
-./build_installer_mac.sh --no-dmg     # 只打 pkg
-./build_installer_mac.sh --sign "Developer ID Application: ..."  # 签名后打包
-```
-
-输出 `dist\Entropy_Setup_<ver>_macOS.pkg / .dmg`。
+- Windows：`build_installer.bat` → `dist\iisaacbeats_ScienceSeries_Setup_<ver>_x64.exe`
+- macOS：`build_installer_mac.sh` → `dist\iisaacbeats_ScienceSeries_Setup_<ver>_macOS.pkg / .dmg`
 
 ---
 

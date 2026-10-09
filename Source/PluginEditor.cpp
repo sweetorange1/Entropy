@@ -22,6 +22,29 @@ float presetClusterWidth()
         w = juce::jmax(w, juce::GlyphArrangement::getStringWidth(font, p.name));
     return juce::jmax(84.0f, w + 26.0f);
 }
+
+// 右侧五条退化描述符的悬停提示：每载体每行一句话说明该退化是什么。
+// 布局与 §6.4 的行语义表一致（0 带宽、1 走带/码率、2 断续、3 声场/误纠、4 表面/涂抹）。
+const char* descriptorEffectTooltip(int carrier, int row) noexcept
+{
+    constexpr std::array<const char*, 20> tips {
+        // TAPE
+        "High-frequency loss + saturation", "Wow, flutter, azimuth drift", "Dropouts + print-through echo",
+        "Stereo width collapse", "Tape hiss",
+        // VINYL
+        "High-frequency loss + groove distortion", "Eccentric pitch wobble", "Dust clicks and crackles",
+        "Stereo width (no degradation)", "Dust hiss",
+        // STREAM
+        "Lossy high-frequency cut", "Bitrate ladder 320-64 kb/s", "Packet-loss dropouts",
+        "Stereo width collapse", "Pre-echo smear",
+        // PHASE
+        "High-frequency loss", "Clock jitter", "Read-error dropouts",
+        "Mis-corrected birdie tones", "Disc noise floor"
+    };
+    const int c = std::clamp(carrier, 0, 3);
+    const int r = std::clamp(row, 0, 4);
+    return tips[static_cast<size_t>(c * 5 + r)];
+}
 }
 
 using entropy::ui::ink;
@@ -92,7 +115,7 @@ EntropyAudioProcessorEditor::EntropyAudioProcessorEditor(EntropyAudioProcessor& 
     selectedDateLabel.setJustificationType(juce::Justification::centredRight);
     selectedDateLabel.setColour(juce::Label::textColourId, ink);
     selectedDateLabel.setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
-    selectedDateLabel.setTooltip("Double-click to enter a local date: DD Mon YYYY HH:MM:SS (or YYYY-MM-DD HH:MM:SS). The date stays fixed while real time passes.");
+    selectedDateLabel.setTooltip("Double-click to edit the date");
     selectedDateLabel.onTextChange = [this]
     {
         juce::int64 date = 0;
@@ -112,9 +135,9 @@ EntropyAudioProcessorEditor::EntropyAudioProcessorEditor(EntropyAudioProcessor& 
         repaint();
     };
     addAndMakeVisible(selectedDateLabel);
-    inputSlider.setTooltip("Input trim before degradation. Drag vertically; double-click to enter dB.");
-    mixSlider.setTooltip("Linear dry/wet mix. Both paths retain the reported 10 ms latency.");
-    outputSlider.setTooltip("Output trim. No hidden limiter: reduce this if the output meter clips.");
+    inputSlider.setTooltip("Input trim before degradation");
+    mixSlider.setTooltip("Dry/wet mix");
+    outputSlider.setTooltip("Output trim");
     for (int i = 0; i < 4; ++i)
     {
         auto& button = carrierButtons[static_cast<size_t>(i)];
@@ -129,7 +152,7 @@ EntropyAudioProcessorEditor::EntropyAudioProcessorEditor(EntropyAudioProcessor& 
         const auto c = processor.currentControls();
         processor.setParameter(entropy::ids::generations, static_cast<float>(c.generations % 8 + 1));
     };
-    generation.setTooltip("Streaming only: click to cycle 1-8 simulated transcoding generations. This is not an MP3 encoder.");
+    generation.setTooltip("Transcoding generations - click to cycle");
     presetPanel.onChosen = [this](int index)
     {
         hideArchive();
@@ -168,7 +191,7 @@ void EntropyAudioProcessorEditor::resized()
     presetPanel.setBounds(getLocalBounds());
     selectedDateLabel.setFont(juce::Font(juce::FontOptions(17.0f * scale)));
     for (int i = 0; i < 4; ++i)
-        carrierButtons[static_cast<size_t>(i)].setBounds(scaled(32 + i * 147, 64, 137, 36));
+        carrierButtons[static_cast<size_t>(i)].setBounds(scaled(32 + i * 147, 122, 137, 36));
     timelineControl.setBounds(scaled(32, 452, 578, 80));
     selectedDateLabel.setBounds(scaled(650, 92, 278, 30));
     inputSlider.setBounds(scaled(128, 566, 80, 68));
@@ -281,6 +304,33 @@ void EntropyAudioProcessorEditor::mouseExit(const juce::MouseEvent&)
     repaint();
 }
 
+juce::String EntropyAudioProcessorEditor::getTooltip()
+{
+    // 预设面板是全屏遮罩层，打开时顶栏提示一律隐藏。
+    if (presetPanel.isVisible())
+        return {};
+
+    const auto p = getMouseXYRelative().toFloat() / scale;
+    if (websiteBounds().contains(p))
+        return "Visit iisaacbeats.cn";
+    if (formulaBounds().contains(p))
+        return "Open preset list";
+    if (prevPresetBounds().contains(p))
+        return "Previous preset";
+    if (nextPresetBounds().contains(p))
+        return "Next preset";
+    if (bypassBounds().contains(p))
+        return "Bypass all processing";
+    if (descriptorResetBounds().contains(p))
+        return "Restore all effect defaults";
+    if (const int row = descriptorRowAt(p); row >= 0)
+    {
+        const int carrier = processor.currentControls().carrier;
+        return juce::String(descriptorEffectTooltip(carrier, row)) + "\nclick to bypass - drag to adjust";
+    }
+    return {};
+}
+
 void EntropyAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
 {
     commitKnobEdit();
@@ -362,6 +412,11 @@ void EntropyAudioProcessorEditor::paint(juce::Graphics& g)
     const auto accent = displayAccent;
     g.setColour(entropy::ui::line);
     g.drawHorizontalLine(52, 0.0f, 960.0f);
+    // 标题带（与 Transcription 同格式）：小号眉题 + 27px 大标题，位于顶栏下方左侧。
+    text(g, "02 / PHYSICAL CHEMISTRY", 32, 66, 240, 17, 9.5f, muted);
+    g.setColour(entropy::ui::ink);
+    g.setFont(juce::Font(juce::FontOptions(27.0f)));
+    g.drawText("Entropy", juce::Rectangle<float>(30, 84, 260, 33), juce::Justification::centredLeft, false);
     const auto website = websiteBounds();
     const auto websiteColour = websiteHovered ? juce::Colour(0xff666666) : juce::Colours::black;
     g.setColour(websiteColour);
@@ -494,16 +549,16 @@ void EntropyAudioProcessorEditor::drawSpecimen(juce::Graphics& g, const entropy:
     const float eased = transition * transition * (3.0f - 2.0f * transition);
     const auto accent = displayAccent;
     g.setColour(paper);
-    g.fillRoundedRectangle(32, 116, 578, 322, 4);
+    g.fillRoundedRectangle(32, 164, 578, 274, 4);
     g.setColour(entropy::ui::line);
-    g.drawRoundedRectangle(32, 116, 578, 322, 4, 1);
+    g.drawRoundedRectangle(32, 164, 578, 274, 4, 1);
     text(g, "0" + juce::String(fromCarrier + 1) + " / " + entropy::carrierName(fromCarrier),
-         49.0f - 10.0f * eased, 130, 240, 18, 11, accent.withAlpha(1.0f - eased));
+         49.0f - 10.0f * eased, 178, 240, 18, 11, accent.withAlpha(1.0f - eased));
     text(g, "0" + juce::String(c.carrier + 1) + " / " + entropy::carrierName(c.carrier),
-         49.0f + 10.0f * (1.0f - eased), 130, 240, 18, 11, accent.withAlpha(0.18f + 0.82f * eased));
+         49.0f + 10.0f * (1.0f - eased), 178, 240, 18, 11, accent.withAlpha(0.18f + 0.82f * eased));
     g.setFont(formulaFont(10.5f));
     g.setColour(muted);
-    g.drawText("S = k ln W", juce::Rectangle<float>(448, 130, 144, 16), juce::Justification::centredRight, false);
+    g.drawText("S = k ln W", juce::Rectangle<float>(448, 178, 144, 16), juce::Justification::centredRight, false);
     {
         // 微观状态数随熵爆炸：W = 10^(23·S)，熵 0 时 W = 1。
         const float exponent = 23.0f * c.entropy;
@@ -511,29 +566,63 @@ void EntropyAudioProcessorEditor::drawSpecimen(juce::Graphics& g, const entropy:
             : juce::String::fromUTF8("W ≈ 10^") + juce::String(exponent, 1);
         g.setFont(juce::Font(juce::FontOptions(8.5f)));
         g.setColour(muted.withAlpha(0.9f));
-        g.drawText(microstates, juce::Rectangle<float>(448, 147, 144, 12), juce::Justification::centredRight, false);
+        g.drawText(microstates, juce::Rectangle<float>(448, 195, 144, 12), juce::Justification::centredRight, false);
     }
     {
         const juce::Graphics::ScopedSaveState particleState(g);
-        g.reduceClipRegion(49, 153, 544, 120);
+        g.reduceClipRegion(49, 201, 544, 72);
         constexpr int columns = 15, rows = 5;
+        // 每种载体一种排布（相邻 index 的连线自动勾勒排布形态）：
+        //   TAPE   磁迹——5 条平行横线
+        //   VINYL  唱片纹路——单根内卷螺旋（每圈 15 点，共 5 圈）
+        //   STREAM 数据流——横向波浪线（6 个周期）
+        //   PHASE  光盘轨道——5 个同心椭圆环
+        // 载体切换时 fromCarrier 与当前载体的坐标按 eased 补间，动画自动成立。
         const auto pointFor = [this, &c, columns](int index, int carrier)
         {
             const float id = static_cast<float>(index);
             const float jitter = c.entropy * (4.0f + 18.0f * c.entropy);
             const int x = index % columns;
             const int y = index / columns;
-            float px = 70.0f + static_cast<float>(x) * 35.5f;
-            float py = 166.0f + static_cast<float>(y) * 24.0f;
-            if (carrier == 1 || carrier == 3)
+            float px, py;
+            switch (carrier)
             {
-                const float angle = static_cast<float>(x) / 15.0f * juce::MathConstants<float>::twoPi;
-                const float radius = 24.0f + static_cast<float>(y) * 19.0f;
-                px = 319.0f + std::cos(angle) * radius * 2.6f;
-                py = 212.0f + std::sin(angle) * radius * 0.58f;
+                case 1:   // VINYL：音槽弧带——低视角唱片的透视音槽：下方弧（近处）更短更弯，
+                {         // 上方弧（远处）更长更平缓，即真实唱片照片中同心音槽的透视形态
+                    const float frac = static_cast<float>(x) / 14.0f;
+                    const float radius = 380.0f - static_cast<float>(y) * 62.0f;
+                    const float yCentre = 210.0f + static_cast<float>(y) * 12.0f;
+                    const float sagitta = juce::jmin(55.0f, 270.0f - yCentre);
+                    const float halfSpan = std::sqrt(2.0f * radius * sagitta - sagitta * sagitta);
+                    const float arcX = (frac * 2.0f - 1.0f) * halfSpan;
+                    px = 319.0f + arcX;
+                    py = yCentre + radius - std::sqrt(radius * radius - arcX * arcX);
+                    break;
+                }
+                case 2:   // STREAM：5 条并行波浪线（与 TAPE 同构），行间相位错开
+                {
+                    px = 70.0f + static_cast<float>(x) * 35.5f;
+                    const float frac = static_cast<float>(x) / 14.0f;
+                    py = 208.0f + static_cast<float>(y) * 14.0f
+                        + 5.0f * std::sin(frac * juce::MathConstants<float>::twoPi * 6.0f
+                                          + static_cast<float>(y) * 0.7f);
+                    break;
+                }
+                case 3:   // PHASE 同心椭圆环
+                {
+                    const float angle = static_cast<float>(x) / 15.0f * juce::MathConstants<float>::twoPi;
+                    const float radius = 24.0f + static_cast<float>(y) * 19.0f;
+                    px = 319.0f + std::cos(angle) * radius * 2.6f;
+                    py = 232.0f + std::sin(angle) * radius * 0.30f;
+                    break;
+                }
+                default:  // TAPE 平行横线
+                {
+                    px = 70.0f + static_cast<float>(x) * 35.5f;
+                    py = 207.0f + static_cast<float>(y) * 14.0f;
+                    break;
+                }
             }
-            if (carrier == 2)
-                py += static_cast<float>((x / 3) % 3) * c.entropy * 7.0f;
             return juce::Point<float> {
                 px + std::sin(id * 13.13f + animation * 0.5f) * jitter,
                 py + std::cos(id * 8.71f + animation * 0.4f) * jitter * 0.30f
@@ -985,7 +1074,7 @@ void EntropyAudioProcessorEditor::drawDescriptors(juce::Graphics& g, const entro
         text(g, "TRANSCODE PASSES", 776, 483, 153, 28, 9, muted, juce::Justification::centredRight);
     else
         text(g, c.carrier == 0 ? "CONTINUOUS DECAY" : c.carrier == 1 ? "STOCHASTIC SURFACE EVENTS" : "MISCORRECTION ARTEFACTS",
-             650, 480, 280, 34, 10, muted);
+             776, 483, 153, 28, 9, muted, juce::Justification::centredRight);
 }
 
 void EntropyAudioProcessorEditor::timerCallback()
@@ -1012,8 +1101,11 @@ void EntropyAudioProcessorEditor::timerCallback()
     meterOut = juce::jmax(processor.outputLevel.exchange(0.0f, std::memory_order_relaxed), meterOut * 0.86f);
     for (int i = 0; i < 4; ++i)
         carrierButtons[static_cast<size_t>(i)].setToggleState(c.carrier == i, juce::dontSendNotification);
-    generation.setVisible(c.carrier == 2);
-    generation.setButtonText("GEN 0" + juce::String(c.generations));
+    generation.setVisible(true);
+    generation.setButtonText(entropy::storageName(c.carrier, c.generations)
+        + (c.carrier == 2 ? juce::String()
+                           : juce::String(" ") + juce::String(c.generations) + "/8"));
+    generation.setTooltip(entropy::storageTooltip(c.carrier));
     const int index = processor.matchingFactoryPreset();
     presetPanel.setCurrentIndex(index);
     if (statusTicks > 0)

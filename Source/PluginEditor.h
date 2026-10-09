@@ -4,7 +4,9 @@
 #include "UI/TimelineControl.h"
 #include "UI/PresetPanel.h"
 
-class EntropyAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
+class EntropyAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                          public juce::TooltipClient,
+                                          private juce::Timer
 {
 public:
     explicit EntropyAudioProcessorEditor(EntropyAudioProcessor&);
@@ -17,6 +19,7 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
+    juce::String getTooltip() override;
     static float intensityFromBarPosition(float scaledX) noexcept { return juce::jlimit(0.0f, 1.0f, (scaledX - 696.0f) / 232.0f); }
     static const char* moduleLabel(int carrier, int row) noexcept;
 

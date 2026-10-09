@@ -15,7 +15,7 @@ public:
         setName("Carrier date timeline");
         setWantsKeyboardFocus(true);
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        setTooltip("Left: older / more disorder. Right: now / less disorder. Double-click to enter a 0-100 value (0 = now, 100 = oldest). Arrow keys move; Home/End select oldest/now.");
+        setTooltip("Drag to pick a date - double-click to type 0-100");
     }
     ~TimelineControl() override { finishGesture(); }
 

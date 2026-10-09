@@ -198,6 +198,16 @@ void EntropyAudioProcessor::setParameter(const char* id, float plainValue)
             const auto snapshot = timelineSnapshot();
             selectDate(entropy::timeline::dateAt(plainValue, snapshot.now, snapshot.carrier));
         }
+        else if (juce::String(id) == entropy::ids::carrier)
+        {
+            // 切换载体保持时间轴比例（有效 Entropy），按新跨度重新锚定日期。
+            // 时间只是包装：在 TAPE 拉到最左，切到 VINYL 仍应停最左。
+            const auto snapshot = timelineSnapshot();
+            const float amount = snapshot.amount();   // 旧载体下的当前熵
+            const int newCarrier = static_cast<int>(entropy::finiteClamp(plainValue, 0.0f, 3.0f));
+            parameter->setValueNotifyingHost(parameter->convertTo0to1(plainValue));
+            selectedDate.store(entropy::timeline::dateAt(amount, snapshot.now, newCarrier));
+        }
         else
             parameter->setValueNotifyingHost(parameter->convertTo0to1(plainValue));
         parameter->endChangeGesture();

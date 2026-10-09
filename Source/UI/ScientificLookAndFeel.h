@@ -11,7 +11,8 @@ inline const juce::Colour paper { 0xfff7f8f4 };
 inline const juce::Colour blue { 0xff2a6fb0 };
 inline juce::Colour carrierColour(int index)
 {
-    constexpr std::array<juce::uint32, 4> colours { 0xffaf614c, 0xff687b54, 0xff2a6fb0, 0xff807396 };
+    // 参考 Organic Chemistry 的 CPK 元素配色，提高饱和度，让四载体在白底上更鲜明。
+    constexpr std::array<juce::uint32, 4> colours { 0xffb05a44, 0xff6e9a52, 0xff3a78c2, 0xff8764a6 };
     return juce::Colour(colours[static_cast<size_t>(juce::jlimit(0, 3, index))]);
 }
 

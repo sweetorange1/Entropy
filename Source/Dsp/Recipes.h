@@ -59,6 +59,8 @@ void applyModuleBypass(Recipe&, Carrier, std::uint32_t mask) noexcept;
 float surfaceNoiseMax(Carrier) noexcept;
 const char* carrierName(int) noexcept;
 const char* carrierMechanism(int) noexcept;
+const char* storageName(int carrier, int level) noexcept;
+const char* storageTooltip(int carrier) noexcept;
 const char* degradationStage(float) noexcept;
 float finiteClamp(float value, float low, float high, float fallback = 0.0f) noexcept;
 }

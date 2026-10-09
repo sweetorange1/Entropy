@@ -79,17 +79,27 @@ void timelineTests()
     require(restored.currentControls().entropy == 0.0f && restored.timelineSnapshot().selected == exactDate,
             "Clock rollback corrupted date or produced negative entropy");
     clock.store(initialNow);
-    restored.setParameter(entropy::ids::carrier, 0);
-    require(restored.timelineSnapshot().selected == exactDate && restored.currentControls().entropy < 0.001f,
-            "Carrier switch re-anchored the date");
+    {
+        // 切换载体保持时间轴比例（有效 Entropy），按新跨度重新锚定日期。
+        const float proportion = restored.currentControls().entropy;   // STREAM 下的熵 ≈ day/3
+        require(proportion > 0.3f && proportion < 0.4f, "Unexpected pre-switch proportion");
+        restored.setParameter(entropy::ids::carrier, 0);
+        require(std::abs(restored.currentControls().entropy - proportion) < 0.000001f,
+                "Carrier switch changed the timeline proportion");
+        require(restored.timelineSnapshot().selected == tl::dateAt(proportion, initialNow, 0),
+                "Carrier switch did not re-anchor the date to the same proportion");
+    }
     restored.setParameter(entropy::ids::carrier, 2);
     auto* hostParameter = restored.parameters.getParameter(entropy::ids::entropy);
     hostParameter->setValueNotifyingHost(hostParameter->convertTo0to1(0.75f));
     require(std::abs(restored.currentControls().entropy - 0.75f) < 0.000001f, "Direct host automation did not set the date");
     restored.setParameter(entropy::ids::carrier, 0);
+    require(std::abs(restored.currentControls().entropy - 0.75f) < 0.000001f,
+            "Carrier switch changed proportion after host write");
     hostParameter->setValueNotifyingHost(hostParameter->convertTo0to1(0.25f));
     restored.setParameter(entropy::ids::carrier, 2);
-    require(restored.currentControls().entropy == 1.0f, "Old date did not saturate shorter scale");
+    require(std::abs(restored.currentControls().entropy - 0.25f) < 0.000001f,
+            "Carrier switch did not preserve proportion");
     hostParameter->setValueNotifyingHost(hostParameter->convertTo0to1(0.25f));
     require(std::abs(restored.currentControls().entropy - 0.25f) < 0.000001f, "Repeated host value was lost to APVTS deduplication");
     restored.loadFactoryPreset(12);

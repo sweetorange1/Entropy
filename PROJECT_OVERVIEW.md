@@ -2,8 +2,9 @@
 
 > 面向作者、AI 助手和维护者：集中说明“现在做到了什么、参数叫什么、声音如何产生、下一步改哪里”。
 > 本文以当前源码为准，不把灵感文档里的目标功能当作已实现功能。
-> 对应版本：**1.0.0**；更新日期：**2026-10-03**；工程：`I:\理科系列\Entropy`。
-> 本版核心变化：物理化学公式层上线——时间轴标注 σ = dS/dt ≥ 0；右上角融合 Gibbs–Helmholtz 签名公式与随拖动实时计算的 ΔG = ΔH − T·ΔS（T = 298 K 室温锚点，ΔG 在熵 0.5 过零并显示 SPONTANEOUS）；模型视图标题 S = k ln W 与微观状态计数 W ≈ 10^23·S；卡片底部 Arrhenius 速率方程与每载体 Ea、t½（等于时间尺度）；SURFACE 行标注 dS ≥ δQ/T。常数见 `Source/Thermodynamics.h`（艺术标定，t½ 与 ΔG 过零点自洽）。
+> 对应版本：**1.0.4**；更新日期：**2026-10-04**；工程：`I:\理科系列\Entropy`。
+> 本版核心变化：悬停提示全面修订——原 7 处长句提示简化为短句；补齐右侧 5 条退化描述符（按载体动态变化）、顶栏预设簇、箭头、BYPASS、RESET、网址等此前缺失的提示。完整对照见 §6.6。
+> 上版核心变化（1.0.0）：物理化学公式层上线——时间轴标注 σ = dS/dt ≥ 0；右上角融合 Gibbs–Helmholtz 签名公式与随拖动实时计算的 ΔG = ΔH − T·ΔS（T = 298 K 室温锚点，ΔG 在熵 0.5 过零并显示 SPONTANEOUS）；模型视图标题 S = k ln W 与微观状态计数 W ≈ 10^23·S；卡片底部 Arrhenius 速率方程与每载体 Ea、t½（等于时间尺度）；SURFACE 行标注 dS ≥ δQ/T。常数见 `Source/Thermodynamics.h`（艺术标定，t½ 与 ΔG 过零点自洽）。
 > 后续提出需求时，推荐使用“**载体 + 参数字段 + 想要的听感/数值变化**”，例如“让 TAPE 的 `wowMs` 在熵 0.4 后才开始增加”。
 
 ## 目录
@@ -37,11 +38,11 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 产品名 / CMake 主目标 | `Entropy` |
-| 版本 | `1.0.0`，来自 `CMakeLists.txt` 的 `project()` |
+| 产品名 / CMake 主目标 | `ChemE-Entropy`（自 1.0.1 起加系列前缀；CMake target 仍为 `Entropy`，产物目录 `Entropy_artefacts` 不变） |
+| 版本 | `1.0.4`，来自 `CMakeLists.txt` 的 `project()` |
 | 厂商 | `iisaacbeats.cn` |
-| Manufacturer Code / Plugin Code | `Isac` / `Entr` |
-| Bundle ID | `cn.iisaacbeats.Entropy` |
+| Manufacturer Code / Plugin Code | `Isac` / `CE02`（旧为 `Entr`；更换后 VST3 UID 不同，新旧插件在宿主中共存，不覆盖旧安装） |
+| Bundle ID | `cn.iisaacbeats.ChemEEntropy`（旧为 `cn.iisaacbeats.Entropy`） |
 | 分类 | 效果器，VST3 `Fx / Distortion`；AU `kAudioUnitType_Effect` |
 | 格式 | Windows：VST3、Standalone；Apple 配置额外包含 AU |
 | 总线 | mono → mono 或 stereo → stereo；默认立体声，无侧链 |
@@ -80,7 +81,7 @@ PHASE 是光盘载体的界面名称，**不是第五种载体**，也还不是�
 | MIX | Mix | `mix` | `mix` | Float：0–1，步长 0.001 | 1 / 100% | 延迟对齐后的线性干湿混合 |
 | INPUT | Input | `input` | `inputDb` | Float：−24 至 +12 dB，步长 0.1 dB | 0 dB | 湿路输入及干路输入增益；不是仅失真 drive |
 | OUTPUT | Output | `output` | `outputDb` | Float：−24 至 +12 dB，步长 0.1 dB | 0 dB | 干湿混合之后的增益，旁路时绕过 |
-| GEN 01 … GEN 08 | Transcode generations | `generations` | `generations` | Int：1–8，步长 1 | 1 | 仅 STREAM 配方使用；UI 点击循环，不是多次运行真实编码器 |
+| STORE / GEN 01 … 08 | Transcode generations | `generations` | `generations` | Int：1–8，步长 1 | 1 | STREAM 为转码代数；TAPE/VINYL/PHASE 为储存环境（1=理想储存，8=极端恶劣），放大该载体的相应退化 |
 | BYPASS | Bypass | `bypass` | `bypass` | Bool：false / true | false | 平滑切到延迟后的原始输入；也提供给宿主标准旁路接口 |
 
 - 插件主界面不再显示 Entropy 的数字或百分比；日期格式统一为英文 `DD Mon YYYY HH:MM:SS`，例如 `01 Oct 2026 12:34:56`，使用本地时区和固定英文月份。支持该格式直接编辑，也兼容 ISO 和旧中文输入。宿主仍保留原 Entropy 百分比；`mix` 仍显示百分比。日期手输精确到秒，不受宿主 Entropy 的 0.0001 步长限制。
@@ -126,7 +127,7 @@ e_{effective}=\operatorname{clamp}((N-T)/D_c,0,1),\qquad x_{axis}=1-e_{effective
 \]
 
 - 选择日期后保持 \(T\) 不变；刷新 UI、关闭编辑器、保存/重开工程均不把它变为“永远距今多少年”。系统时间推进时，有效 Entropy 增加直至 1；**已经拖到最左端后，再过去一年仍为 1，不会继续增加配方强度**。随机噪声/事件的持续变化不等于继续增强；MIX、行强度、增益和代数也不会随时间自动增加。
-- 切换载体保留同一日期，改用新跨度计算；例如几十年前的日期切到 STREAM 会立即达到最高退化，这是固定日期的既定语义。
+- 切换载体保持时间轴比例（有效 Entropy）不变，按新跨度重新锚定日期；时间只是包装——例如在 TAPE 拉到最左，切到 VINYL 仍停最左，日期随之改到 100 年前。
 - 比最旧端还古老的日期保留原值，滑块贴左端并提示 BEYOND SCALE；系统时钟回拨导致日期暂时在未来时，保持该日期但有效值钳为 0；用户手输未来日期会被拒绝。
 - `timeline::Clock` 在专用线程每约 100 ms 缓存本机时钟；音频线程只读原子值，不做日历转换、系统时间查询、文件操作或 UI 工作。没有 Editor 也能老化。
 - `localDate()` 用本机时区显示，状态保存 UTC 毫秒。Windows 使用原生 FILETIME 时区转换，支持 1970 年以前；本地夏令时不存在的日期时间由往返校验拒绝，重复小时按系统转换选择。
@@ -169,7 +170,7 @@ e_{effective}=\operatorname{clamp}((N-T)/D_c,0,1),\qquad x_{axis}=1-e_{effective
 
 ### 4.1 通用符号
 
-设 \(e\) 为限制到 0–1 的 Entropy；\(g\) 为 1–8 的代数（音频内部为平滑值）；\(\ell=(g-1)/7\)。以下表格以 \(O_a\) 代表 `onset(e, a)`：
+设 \(e\) 为限制到 0–1 的 Entropy；\(g\) 为 1–8 的代数（音频内部为平滑值）；\(\ell=(g-1)/7\)。STREAM 用 \(\ell\) 作代际损失；TAPE/VINYL/PHASE 用同一公式的 \(s=(g-1)/7\) 作“储存环境恶劣程度”（1 = 理想储存，8 = 极端恶劣），仅放大已有退化（随 \(e\) 起效，不改变零熵端的无损语义）。以下表格以 \(O_a\) 代表 `onset(e, a)`：
 
 \[
 x=\operatorname{clamp}\left(\frac{e-a}{1-a},0,1\right),\qquad O_a=x^2(3-2x)
@@ -199,7 +200,7 @@ x=\operatorname{clamp}\left(\frac{e-a}{1-a},0,1\right),\qquad O_a=x^2(3-2x)
 | `width` | \(1-0.62O_{0.4}\) | 0.38 |
 | `echo` | \(0.0178O_{0.35}\) | 0.0178，约 −35 dB |
 
-注意：磁带 dropout 使用 `gapRate`，不是 `eventRate`；本模式没有附加点击脉冲。当前截止终点是 3.6 kHz，不是灵感卡片里的 6 kHz。
+注意：磁带 dropout 使用 `gapRate`，不是 `eventRate`；本模式没有附加点击脉冲。当前截止终点是 3.6 kHz，不是灵感卡片里的 6 kHz。储存环境 \(s\) 使 `cutoffHz` 指数项加 \(0.5s\)、wow/flutter/drift 乘 \(1+0.4s\)、`noise` 乘 \(1+1.5s\)、`gapRate` 乘 \(1+1.2s\)。
 
 ### 4.3 VINYL：事件型退化
 
@@ -214,7 +215,7 @@ x=\operatorname{clamp}\left(\frac{e-a}{1-a},0,1\right),\qquad O_a=x^2(3-2x)
 | `eventLevel` | \(0.10+0.08e\) | 0.18 |
 
 - click 和 crackle 目前由同一个短脉冲事件模型产生；**密度随熵快速上升（0.6e+70e²），幅度基本恒定（0.10–0.18）**，符合“灰尘变多、单颗粒响度不变”的物理直觉。爆音不随 SURFACE 行强度缩放（仅随输入尾音淡出），SURFACE 行只控制 hiss/dust 噪声床。没有独立 click/pop/crackle 三套参数。
-- 这里没有 `gapRate`、独立 scratch、rumble、内圈位置或跳针实现；`width` 保持 1。
+- 这里没有 `gapRate`、独立 scratch、rumble、内圈位置或跳针实现；`width` 保持 1。储存环境 \(s\) 使 `wowMs` 乘 \(1+0.4s\)（翘曲）、`noise` 乘 \(1+1.5s\)（灰尘霉变）、`eventRate` 乘 \(1+1.2s\)（爆音频率）。
 
 ### 4.4 STREAM：码率阶梯与代际损失
 
@@ -233,14 +234,16 @@ UI 在 Entropy < 0.001 时将码率文字显示为 LOSSLESS；这时结构里的
 
 | 字段 | 当前公式 | Entropy = 1，代数 1 → 8 |
 | --- | --- | --- |
-| `cutoffHz` | \(C(1-0.48\ell e)\) | 11000 → 5720 Hz |
+| `cutoffHz` | \(C(1-0.72\ell e)\) | 11000 → 3080 Hz |
 | `filterAmount` | \(O_0\) | 1 |
-| `width` | \(1-O_{0.10}(0.88+0.12\ell)\) | 0.12 → 0 |
-| `smear` | \(O_{0.28}(0.24+0.32\ell)\) | 0.24 → 0.56 |
-| `residue` | \(O_{0.40}(0.20+0.28\ell)\) | 0.20 → 0.48 |
-| `gapRate` | \(2O_{0.60}\) | 2 /s |
+| `width` | \(1-O_{0.10}(0.80+0.20\ell)\) | 0.20 → 0 |
+| `smear` | \(O_{0.28}(0.24+0.52\ell)\) | 0.24 → 0.76 |
+| `residue` | \(O_{0.40}(0.20+0.48\ell)\) | 0.20 → 0.68 |
+| `gapRate` | \((2+4\ell)O_{0.60}\) | 2 → 6 /s |
 | `gapDepth` | \(O_{0.45}\) | 1 |
 | `gapMs` | \(50+250e\) | 300 ms |
+
+代际语义（v1.0.1 调整）：GEN 只放大已有退化（各项均乘 \(e\)），不改变零熵端的无损语义。连续类按深度增长（高频截止、声场塌缩、涂抹、残留的 ℓ 系数加大），事件类按频率增长（`gapRate` 随代数从 2/s 升至 6/s）；单次陷落的时长与深度仍只由熵决定，不随代数变深。
 
 本模式没有加性本底噪声和独立事件脉冲；STREAM 的第 5 行是 TRANSIENT SMEAR（默认强度 1.0），不是 SURFACE 行。代数只改变上述配方系数，没有真的将信号重复转码或反复通过多代引擎。
 
@@ -261,7 +264,7 @@ UI 在 Entropy < 0.001 时将码率文字显示为 LOSSLESS；这时结构里的
 
 `correctionStage` 标签：Entropy < 0.28 为 0 / CORRECTABLE；0.28–0.58 为 1 / INTERPOLATION；0.58–0.93 为 2 / BIRDIES；≥0.93 为 3 / ERROR STORM。
 
-**标签阈值不等同事件激活阈值**：例如插值事件在 Entropy > 0.25 就可能发生；最高档也不再静音，而是鸟鸣与丢读事件密集交织的杂乱状态。这不是完整 CIRC 纠错状态机。
+**标签阈值不等同事件激活阈值**：例如插值事件在 Entropy > 0.25 就可能发生；最高档也不再静音，而是鸟鸣与丢读事件密集交织的杂乱状态。这不是完整 CIRC 纠错状态机。储存环境 \(s\) 使 `noise` 乘 \(1+1.2s\)、`eventRate` 与 `birdieRate` 乘 \(1+1.2s\)、`gapRate` 乘 \(1+1.0s\)。
 
 ## 5. DSP 链路、算法与时间常数
 
@@ -337,15 +340,16 @@ y_p=((1-m)dG_i+mw)G_o,\qquad y=(1-b)y_p+bd
 | 预设覆盖层 | 点击条目应用并关闭；点击非条目区域、Close 或 Esc 关闭且不穿透；方向键/Tab 导航、Enter/Space 选择；布局随窗口缩放，不再使用默认级联菜单 |
 | `<` / `>` | 在 20 个工厂预设间循环；自定义状态以当前载体第一项为基准再向前/后一步；纯文字绘制，命中区随名称宽度变化 |
 | BYPASS | 右上纯文字，悬停或激活时加下划线，激活用强调色；切换标准旁路参数并随宿主同步 |
-| 四载体按钮 | 切换 `carrier`，保持选定日期，按新跨度重算有效 Entropy；切换带动约 0.3 s 过渡：强调色平滑插值，粒子阵型补间，图样带为两段式擦除（旧带先整体左移淡出，新带再从右侧进入，任一时刻只显示一个状态），时间轴/旋钮/描述符同步过渡 |
-| MODEL VIEW | 15×5 点的有序/失序动画；下方有磁带盒/唱片/数据流/光盘及对应纹理，不是音频分析 |
+| 标题带 | 顶栏下方左侧两行：眉题 `02 / PHYSICAL CHEMISTRY`（9.5px muted）+ 大标题 `Entropy`（27px ink），与 Transcription 同格式；载体按钮移至标题带下方（y 122-158），卡片顶边 116→164（高 322→274），卡片头部下移、粒子区行距压缩（24→14，圆阵纵比 0.58→0.30），卡片底部、纹理带、时间轴、旋钮与右侧描述符区不变 |
+| 四载体按钮 | 切换 `carrier`，保持时间轴比例（有效 Entropy）不变，按新跨度重新锚定日期；切换带动约 0.3 s 过渡：强调色平滑插值，粒子阵型补间，图样带为两段式擦除（旧带先整体左移淡出，新带再从右侧进入，任一时刻只显示一个状态），时间轴/旋钮/描述符同步过渡 |
+| MODEL VIEW | 75 点按载体排布的有序/失序动画：TAPE 5 条平行横线（磁迹）、VINYL 透视音槽弧带（低视角唱片的音槽：上方弧更长更平缓、下方弧更短更弯）、STREAM 5 条并行波浪线（6 周期、行间相位错开）、PHASE 5 个同心椭圆环；相邻点连线勾勒形态，载体切换时新旧阵型按 eased 补间；下方有磁带盒/唱片/数据流/光盘及对应纹理，不是音频分析 |
 | CARRIER TIMELINE | 左旧右今；41 个标尺刻度、5 个主日期标签；拖动或方向键选择，Home/End 选最旧/现在，Shift+方向键精调；保留键盘焦点但不绘制圆角聚焦框。标题行与方向引导文字已按系列风格精简移除 |
 | 热力学公式层 | 五处纯展示公式（斜体，`Source/Thermodynamics.h` 艺术标定）：① 时间轴右端 `σ = dS/dt ≥ 0`；② 右上签名 `∂(ΔG/T)/∂T = −ΔH/T²` 与活公式 `ΔG = ΔH − T·ΔS`（T = 298 K 室温常数，ΔS 来自时间轴，ΔG 在熵 0.5 过零，过零后左上显示 `SPONTANEOUS`）；③ 模型视图标题 `S = k ln W` 与 `W ≈ 10^(23·S)` 微观状态计数；④ 卡片底部 `k = A·e^(−Ea/RT)` 及每载体 `Ea`、`t½`（恰等于该载体时间尺度）；⑤ SURFACE 行 `dS ≥ δQ/T`（噪声床 = 热流）。公式字符串必须经 `juce::String::fromUTF8`，字体用含 ∂Δσδ≥≈²·½ 字形的默认 UI 斜体 |
 | 日期显示 | 右上（`CARRIER DATE / LOCAL TIME` 下方）显示选定日期，NOW 行显示当前时钟，统一为英文 `DD Mon YYYY HH:MM:SS`；双击右上日期可直接按原显示格式精确编辑，兼容 ISO/旧中文输入，Enter 提交、Esc 取消 |
 | 时间轴快捷输入 | 双击时间轴或按 Enter 弹出 0–100 数值框（0 = 现在/最右，100 = 最古老/混乱最高），输入数字即按时间尺度换算为日期；越界钳制到 0–100，非法文本取消；点击别处提交、Esc 取消 |
 | 右侧数值区 | 标签、突出数值、几何图标和细进度线；图标表达带宽/波动/断裂/声场/噪声等意义；细线上有强度手柄，**按住拖动即可设置该行强度（0–100%）** |
 | INPUT / MIX / OUTPUT | 旋钮样式与 Organic Chemistry 反应剖面（ADSR）控制器同款：5 段仪表刻度、强调色值弧、浅色主体与同色指针；纵向拖动，向上增大；双击打开自绘白色圆角数值框，dB 与百分比独立换算、框旁显示单位；回车/点击别处提交，Esc 取消；滚轮禁用 |
-| GEN | 仅 STREAM 显示；点击 1→2→…→8→1；不通过载体切换清零 |
+| STORE / GEN | 四载体均显示；点击 1→2→…→8→1；STREAM 显示 `GEN 01–08`（转码代数），其余显示 `环境名 x/8`（TAPE：VAULT / CLIMATE / CABINET / DRAWER / ATTIC / GARAGE / BASEMENT / MAGNET；VINYL：RACK / SLEEVE / PAPER / STACKED / ATTIC / GARAGE / DAMP / SUN；PHASE：CASE / CABINET / DESK / LOOSE / SILL / CAR / DAMP / SUN）；不通过载体切换清零 |
 | IN / OUT | 输入 trim 前 / 最终输出后的采样峰值，合并声道；不是 RMS、LUFS 或 true peak |
 | 右下角缩放 | 默认 960×640，固定 3:2；720×480 至 1920×1280，即 75%–200% |
 
@@ -425,6 +429,40 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 
 编辑器关闭时累积器仍可能保留峰值，重开会显示一次此前峰值；这不是持久化状态。
 
+### 6.6 悬停提示对照表（v1.0.1 修订）⭐
+
+机制：`juce::TooltipWindow`（成员 `tooltip`，约 0.65 s 延迟，白底细线样式由 `ScientificLookAndFeel` 配置）。JUCE 8 的 TooltipWindow 只查询鼠标正下方组件（`TooltipClient`），不向父组件遍历，因此：子控件（时间轴、日期、旋钮、载体按钮、GEN）用 `setTooltip()`；编辑器自绘区域（顶栏、右侧描述符行）由 `EntropyAudioProcessorEditor::getTooltip()` 按实时鼠标坐标返回。提示文本全部为纯 ASCII 短句；按住鼠标拖动时提示自动隐藏。
+
+| 区域 / 控件 | 提示内容（v1.0.1 起） | 备注 |
+| --- | --- | --- |
+| 网址 `iisaacbeats.cn` | `Visit iisaacbeats.cn` | 新增；`PluginEditor::getTooltip()` |
+| 顶栏预设名称 | `Open preset list` | 新增；同上 |
+| `<` 箭头 | `Previous preset` | 新增；同上 |
+| `>` 箭头 | `Next preset` | 新增；同上 |
+| BYPASS | `Bypass all processing` | 新增；同上 |
+| RESET | `Restore all effect defaults` | 新增；同上 |
+| 右侧 5 条描述符行 | 第 1 行：该载体该行的退化含义；第 2 行：`click to bypass - drag to adjust`（含义见下方 4×5 表） | 新增；`descriptorEffectTooltip()` 表 + `getTooltip()` 按当前载体动态拼接 |
+| CARRIER TIMELINE | `Drag to pick a date - double-click to type 0-100` | 简化（原为三句长文）；`TimelineControl` 构造 |
+| 右上选定日期 | `Double-click to edit the date` | 简化（原含日期格式示例长句） |
+| INPUT 旋钮 | `Input trim before degradation` | 简化（去掉拖拽/双击操作说明） |
+| MIX 旋钮 | `Dry/wet mix` | 简化（去掉延迟说明） |
+| OUTPUT 旋钮 | `Output trim` | 简化（去掉限幅器说明） |
+| TAPE 按钮 | `Magnetic tape - decays over 60 years` | 重写（原为机制术语短语）；`carrierMechanism()` |
+| VINYL 按钮 | `Vinyl record - wears over 100 years` | 同上 |
+| STREAM 按钮 | `Digital stream - degrades over 24 hours` | 同上 |
+| PHASE 按钮 | `Optical disc - degrades over 40 years` | 同上 |
+| GEN 按钮（仅 STREAM） | `Transcoding generations - click to cycle` | 简化 |
+
+描述符行第 1 行文案（`descriptorEffectTooltip(carrier, row)`，`Source/PluginEditor.cpp` 匿名命名空间）：
+
+| 行 | TAPE | VINYL | STREAM | PHASE |
+| --- | --- | --- | --- | --- |
+| 0 BANDWIDTH | High-frequency loss + saturation | High-frequency loss + groove distortion | Lossy high-frequency cut | High-frequency loss |
+| 1 TRANSPORT / BITRATE | Wow, flutter, azimuth drift | Eccentric pitch wobble | Bitrate ladder 320-64 kb/s | Clock jitter |
+| 2 DISCONTINUITIES | Dropouts + print-through echo | Dust clicks and crackles | Packet-loss dropouts | Read-error dropouts |
+| 3 STEREO / MISCORRECTION | Stereo width collapse | Stereo width (no degradation) | Stereo width collapse | Mis-corrected birdie tones |
+| 4 SURFACE / SMEAR | Tape hiss | Dust hiss | Pre-echo smear | Disc noise floor |
+
 ## 7. 工厂预设与状态持久化
 
 ### 7.1 20 个工厂快照
@@ -490,7 +528,7 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | `Source/Dsp/Recipes.h` / `Recipes.cpp` | `Controls`、`Recipe`、退化映射与标签 | 改阈值、曲线、目标强度 |
 | `Source/Dsp/EntropyEngine.h` / `EntropyEngine.cpp` | DSP 生命周期、延迟、滤波、事件、随机、平滑、混音 | 改处理算法、时序、调制常量 |
 | `Source/PluginProcessor.h` / `PluginProcessor.cpp` | JUCE 生命周期、总线、APVTS、状态、预设应用、峰值发布 | 宿主接口、状态兼容、参数传递 |
-| `Source/PluginEditor.h` / `PluginEditor.cpp` | 布局、描述符、模型动画、菜单、文件对话框 | 界面文字/交互/显示逻辑 |
+| `Source/PluginEditor.h` / `PluginEditor.cpp` | 布局、描述符、模型动画、菜单、文件对话框、悬停提示（`getTooltip()` 与 `descriptorEffectTooltip()`，见 §6.6） | 界面文字/交互/显示逻辑 |
 | `Source/UI/ScientificLookAndFeel.h` | 色板、自绘按钮/滑块、数值编辑入口 | 系列风格、旋钮绘制 |
 | `Tests/DspTests.cpp` | 独立 DSP 回归 | 音频端点、自动化、块大小等行为 |
 | `Tests/StateTests.cpp` | JUCE 状态与 UI 生命周期回归 | 预设/恢复/Editor 行为 |
@@ -555,11 +593,21 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | 测试记录 | `I:\理科系列\Entropy\cmake-build-ninja\Testing\Temporary\LastTest.log` |
 | UI 快照 | `I:\理科系列\Entropy\cmake-build-ninja\Entropy-preview.png`（StateTests 在工作目录生成） |
 
-开发构建不会自动安装插件；还没有安装器、签名、公证或自动更新发布流程。
+开发构建不会自动安装插件；独立安装器脚本（原 `build_installer.bat` / `build_installer_mac.sh` / `entropy_installer.iss`）已删除，本插件只随系列大安装包分发（`i:/理科系列/build_installer.bat` → `dist/iisaacbeats_ScienceSeries_Setup_<ver>_x64.exe`）。签名、公证或自动更新发布流程仍未建立。
 
 ### 9.3 已验证与未验证
 
 1.0.0 Windows VST3 / Standalone 已重新构建并输出 `BUILD_OK`；`EntropyDSPTests` 和 `EntropyStateTests` 两项通过。覆盖内容除前述外，新增热力学公式层一致性校验（ΔG 恰在熵 0.5 过零、t½ 等于载体时间尺度、速率常数为正）与公式字符串 UTF-8 渲染验证。公式数值为艺术标定（T = 298 K 为真实室温锚点），不代表真实热化学测量；预览测试使用固定测试时钟，图片中的 NOW 并非拍摄时的实时系统时间。
+
+1.0.1（悬停提示修订）Windows VST3 / Standalone 已构建并输出 `BUILD_OK`；`EntropyDSPTests` 与 `EntropyStateTests` 两项通过。本轮为纯 UI 文案与提示改动（见 §6.6），未改动 DSP；悬停提示的视觉观感尚未做截图验收。本版本随后进行**全系列改名**：显示名 `ChemE-Entropy`、Bundle ID `cn.iisaacbeats.ChemEEntropy`、Plugin Code `CE02`，改名后重新构建 `BUILD_OK` 并纳入系列安装包（与旧插件共存，不卸载旧安装）。
+
+同日后续修订（仍为 1.0.1）：① 模型视图粒子按载体差异化排布（VINYL 螺旋、STREAM 波浪，见 §6.1），截图已检查；② STREAM 代际加强（§4.4 公式更新），`EntropyDSPTests` 的曲线单调性、旁路还原、强度缩放语义全部仍通过；GEN 1（loss=0）配方与旧版完全一致。系列安装包版本定为 1.2.0。
+
+**1.0.2**：模型视图排布再调整——VINYL 由螺旋/灰尘盘改为 5 条横贯全宽的上凸音槽弧带，STREAM 由单根波浪线改为 5 条并行波浪线（与 TAPE 同构、行间相位错开），四种载体的排布均占满整个粒子显示区；截图（VINYL/STREAM）已检查，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
+
+**1.0.3 / 1.0.4**：VINYL 音槽弧带两轮迭代——1.0.3 尝试同心圆弧（圆心近、上长下短），小半径下弧带收缩成拱顶团块，弃用；1.0.4 改为**透视音槽带**（真实唱片照片中同心音槽的低视角形态）：五条弧各自参数化（半径 380→132、矢高 55→12），上方弧更长更平缓、下方弧更短更弯，跨度 392/321/252/183/109 设计像素逐级收窄；截图已检查，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
+
+**1.0.4 同日后续修订（强调色饱和度）**：`carrierColour` 四载体强调色整体提升饱和度，参考 Organic Chemistry 的 CPK 元素配色让白底上的彩色更鲜明——TAPE `#af614c→#b05a44`、VINYL `#687b54→#6e9a52`、STREAM `#2a6fb0→#3a78c2`、PHASE `#807396→#8764a6`，色相不变。该函数是界面所有载体彩色的单一来源，故按钮、时间轴、旋钮、粒子动画、载体图标与描述符区同步生效。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
 
 | 测试 | 当前覆盖 |
 | --- | --- |
@@ -589,7 +637,7 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | PHASE 完整 CIRC、birdie、跳轨 | 已实现简单扫频鸟鸣（`birdieRate`）与短保持/插值、陷落近似；不是完整 CIRC 纠错状态机，也没有播放位置跳变 |
 | Annealing / Quench、擦写次数 | 尚未实现；PHASE 名称/动画不代表这些控件已存在 |
 | 随机化、Undo/Redo、A/B、Reset 控件 | 尚未实现，不要与引擎内部 `reset()` 混淆 |
-| 发布设施 | 无安装器、签名/公证、在线授权、自动更新或遥测 |
+| 发布设施 | 仅随系列大安装包分发（iisaacbeats Science Series）；无签名/公证、在线授权、自动更新或遥测 |
 
 ## 11. 下一轮需求如何点名与定位
 

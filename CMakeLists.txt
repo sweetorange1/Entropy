@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Entropy VERSION 1.0.0 LANGUAGES C CXX)
+project(Entropy VERSION 1.0.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,11 +29,11 @@ if(ENTROPY_BUILD_PLUGIN)
         list(APPEND entropy_formats AU)
     endif()
     juce_add_plugin(Entropy
-        PRODUCT_NAME "Entropy"
+        PRODUCT_NAME "ChemE-Entropy"
         COMPANY_NAME "iisaacbeats.cn"
-        BUNDLE_ID "cn.iisaacbeats.Entropy"
+        BUNDLE_ID "cn.iisaacbeats.ChemEEntropy"
         PLUGIN_MANUFACTURER_CODE Isac
-        PLUGIN_CODE Entr
+        PLUGIN_CODE CE02
         FORMATS ${entropy_formats}
         IS_SYNTH FALSE
         NEEDS_MIDI_INPUT FALSE
