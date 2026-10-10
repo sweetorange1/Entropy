@@ -3,6 +3,7 @@
 #include "UI/ScientificLookAndFeel.h"
 #include "UI/TimelineControl.h"
 #include "UI/PresetPanel.h"
+#include "shared/IisaacTelemetry.h"
 
 class EntropyAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                           public juce::TooltipClient,
@@ -54,6 +55,7 @@ private:
     juce::Rectangle<int> scaled(int x, int y, int w, int h) const;
 
     EntropyAudioProcessor& processor;
+    std::unique_ptr<iisaac::telemetry::Session> telemetrySession;
     entropy::ui::ScientificLookAndFeel look;
     entropy::ui::NumericSlider inputSlider, mixSlider, outputSlider;
     entropy::ui::KnobInputEditor knobInput, timelineInput;

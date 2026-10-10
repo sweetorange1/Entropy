@@ -2,8 +2,8 @@
 
 > 面向作者、AI 助手和维护者：集中说明“现在做到了什么、参数叫什么、声音如何产生、下一步改哪里”。
 > 本文以当前源码为准，不把灵感文档里的目标功能当作已实现功能。
-> 对应版本：**1.0.4**；更新日期：**2026-10-04**；工程：`I:\理科系列\Entropy`。
-> 本版核心变化：悬停提示全面修订——原 7 处长句提示简化为短句；补齐右侧 5 条退化描述符（按载体动态变化）、顶栏预设簇、箭头、BYPASS、RESET、网址等此前缺失的提示。完整对照见 §6.6。
+> 对应版本：**1.0.5**；更新日期：**2026-10-10**；工程：`I:\理科系列\Entropy`。
+> 本版核心变化：接入遥测与更新推送——参考 Organic Chemistry 加入 `iisaac::telemetry` 遥测会话（Editor 创建后每日一次 `ui_open_daily` 上报）与 `entropy::network` 更新检查（Processor 启动 5 秒后异步 GET `iisaacbeats.cn/api/update/check`，有新版本弹窗提示下载）。详见 §8.1 与 §9.3。
 > 上版核心变化（1.0.0）：物理化学公式层上线——时间轴标注 σ = dS/dt ≥ 0；右上角融合 Gibbs–Helmholtz 签名公式与随拖动实时计算的 ΔG = ΔH − T·ΔS（T = 298 K 室温锚点，ΔG 在熵 0.5 过零并显示 SPONTANEOUS）；模型视图标题 S = k ln W 与微观状态计数 W ≈ 10^23·S；卡片底部 Arrhenius 速率方程与每载体 Ea、t½（等于时间尺度）；SURFACE 行标注 dS ≥ δQ/T。常数见 `Source/Thermodynamics.h`（艺术标定，t½ 与 ΔG 过零点自洽）。
 > 后续提出需求时，推荐使用“**载体 + 参数字段 + 想要的听感/数值变化**”，例如“让 TAPE 的 `wowMs` 在熵 0.4 后才开始增加”。
 
@@ -39,7 +39,7 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 产品名 / CMake 主目标 | `ChemE-Entropy`（自 1.0.1 起加系列前缀；CMake target 仍为 `Entropy`，产物目录 `Entropy_artefacts` 不变） |
-| 版本 | `1.0.4`，来自 `CMakeLists.txt` 的 `project()` |
+| 版本 | `1.0.5`，来自 `CMakeLists.txt` 的 `project()` |
 | 厂商 | `iisaacbeats.cn` |
 | Manufacturer Code / Plugin Code | `Isac` / `CE02`（旧为 `Entr`；更换后 VST3 UID 不同，新旧插件在宿主中共存，不覆盖旧安装） |
 | Bundle ID | `cn.iisaacbeats.ChemEEntropy`（旧为 `cn.iisaacbeats.Entropy`） |
@@ -530,6 +530,10 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | `Source/PluginProcessor.h` / `PluginProcessor.cpp` | JUCE 生命周期、总线、APVTS、状态、预设应用、峰值发布 | 宿主接口、状态兼容、参数传递 |
 | `Source/PluginEditor.h` / `PluginEditor.cpp` | 布局、描述符、模型动画、菜单、文件对话框、悬停提示（`getTooltip()` 与 `descriptorEffectTooltip()`，见 §6.6） | 界面文字/交互/显示逻辑 |
 | `Source/UI/ScientificLookAndFeel.h` | 色板、自绘按钮/滑块、数值编辑入口 | 系列风格、旋钮绘制 |
+| `Source/UI/UpdateDialog.h` / `UpdateDialog.cpp` | 更新提示弹窗（`Download` / `Remind Me Later`；`force_update` 只显示 Download） | 更新弹窗样式与交互 |
+| `Source/network/UpdateChecker.h` / `UpdateChecker.cpp` | 异步更新检查（进程级去重、5 秒超时、失败静默）与 `ShowUpdateDialog` 入口 | 更新接口、弹窗触发 |
+| `Source/network/Version.h` / `Version.cpp` | SemVer 解析与比较（`CompareVersionStrings`） | 版本比较规则 |
+| `Source/shared/IisaacTelemetry.h` | 遥测会话（header-only，`iisaac::telemetry::Session`），每日一次 `ui_open_daily` 上报 | 遥测端点、本地状态文件 |
 | `Tests/DspTests.cpp` | 独立 DSP 回归 | 音频端点、自动化、块大小等行为 |
 | `Tests/StateTests.cpp` | JUCE 状态与 UI 生命周期回归 | 预设/恢复/Editor 行为 |
 | `PROJECT_OVERVIEW.md` | 当前参数和开发导航 | 参数/曲线变更后同步维护 |
@@ -609,6 +613,8 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 
 **1.0.4 同日后续修订（强调色饱和度）**：`carrierColour` 四载体强调色整体提升饱和度，参考 Organic Chemistry 的 CPK 元素配色让白底上的彩色更鲜明——TAPE `#af614c→#b05a44`、VINYL `#687b54→#6e9a52`、STREAM `#2a6fb0→#3a78c2`、PHASE `#807396→#8764a6`，色相不变。该函数是界面所有载体彩色的单一来源，故按钮、时间轴、旋钮、粒子动画、载体图标与描述符区同步生效。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
 
+**1.0.5（接入遥测与更新推送）**：参考 Organic Chemistry，新增 `Source/shared/IisaacTelemetry.h`（遥测会话，`iisaac::telemetry::Session`，Editor 创建、析构释放，每日最多一次 `ui_open_daily` 上报到 `iisaacbeats.cn/api/telemetry/ping`，本地状态存用户目录 `iisaacbeats/Telemetry/entropy.xml`）与 `Source/network/UpdateChecker.{h,cpp}`、`Version.{h,cpp}`、`Source/UI/UpdateDialog.{h,cpp}`（启动 5 秒后异步 GET `iisaacbeats.cn/api/update/check?product=entropy&version=…&platform=…`，进程级去重、5 秒超时、失败静默；有新版本弹窗 `Download` / `Remind Me Later`）。测试实例（`clockForTesting != nullptr`）跳过更新检查；环境变量 `ENTROPY_UPDATE_CHECK_DISABLED=1` 或 `IISAAC_TELEMETRY_DISABLED=1` 可分别关闭。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
+
 | 测试 | 当前覆盖 |
 | --- | --- |
 | `EntropyDSPTests` | 四载体曲线/可听信号变化；Entropy=0、MIX=0、插件/宿主旁路的延迟对齐；mono/stereo；44.1/48/96/192 kHz 端点测试 |
@@ -637,7 +643,7 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 | PHASE 完整 CIRC、birdie、跳轨 | 已实现简单扫频鸟鸣（`birdieRate`）与短保持/插值、陷落近似；不是完整 CIRC 纠错状态机，也没有播放位置跳变 |
 | Annealing / Quench、擦写次数 | 尚未实现；PHASE 名称/动画不代表这些控件已存在 |
 | 随机化、Undo/Redo、A/B、Reset 控件 | 尚未实现，不要与引擎内部 `reset()` 混淆 |
-| 发布设施 | 仅随系列大安装包分发（iisaacbeats Science Series）；无签名/公证、在线授权、自动更新或遥测 |
+| 发布设施 | 随系列大安装包分发（ChemEPlugins）；1.0.5 起接入每日遥测上报与启动更新检查；签名/公证、在线授权仍未建立 |
 
 ## 11. 下一轮需求如何点名与定位
 

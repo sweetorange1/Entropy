@@ -169,10 +169,15 @@ EntropyAudioProcessorEditor::EntropyAudioProcessorEditor(EntropyAudioProcessor& 
     setSize(width, juce::roundToInt(static_cast<float>(width) / 1.5f));
     timerCallback();
     startTimerHz(30);
+
+    telemetrySession = std::make_unique<iisaac::telemetry::Session>(
+        iisaac::telemetry::forPlugin("entropy", JucePlugin_VersionString,
+                                     JucePlugin_VersionString, processor.wrapperType));
 }
 
 EntropyAudioProcessorEditor::~EntropyAudioProcessorEditor()
 {
+    telemetrySession.reset();
     stopTimer();
     setLookAndFeel(nullptr);
 }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Entropy VERSION 1.0.4 LANGUAGES C CXX)
+project(Entropy VERSION 1.0.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,6 +50,10 @@ if(ENTROPY_BUILD_PLUGIN)
         Source/PluginProcessor.cpp Source/PluginProcessor.h
         Source/PluginEditor.cpp Source/PluginEditor.h
         Source/UI/ScientificLookAndFeel.h Source/UI/TimelineControl.h Source/UI/PresetPanel.h
+        Source/UI/UpdateDialog.cpp Source/UI/UpdateDialog.h
+        Source/network/Version.cpp Source/network/Version.h
+        Source/network/UpdateChecker.cpp Source/network/UpdateChecker.h
+        Source/shared/IisaacTelemetry.h
         Source/Timeline.h Source/Timeline.cpp Source/Thermodynamics.h)
     target_compile_definitions(Entropy PUBLIC
         JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)

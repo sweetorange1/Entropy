@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "network/UpdateChecker.h"
 #include <cmath>
 #include <charconv>
 
@@ -35,6 +36,39 @@ EntropyAudioProcessor::EntropyAudioProcessor(const std::atomic<juce::int64>* clo
         moduleIntensity[i].store(defaults[i], std::memory_order_relaxed);
     selectedDate.store(wallClock.now());
     parameters.getParameter(entropy::ids::entropy)->addListener(this);
+
+    // 启动后延迟 5 秒异步检查一次更新（进程级去重，失败静默，仅在有新版本时弹窗）。
+    if (clockForTesting == nullptr && juce::SystemStats::getEnvironmentVariable("ENTROPY_UPDATE_CHECK_DISABLED", {}) != "1")
+    {
+        juce::Timer::callAfterDelay(5000, []
+        {
+#if defined(_M_ARM64) || defined(__aarch64__) || defined(__arm64__)
+            const juce::String arch = "arm64";
+#elif defined(_M_X64) || defined(__x86_64__) || defined(__amd64__)
+            const juce::String arch = "x64";
+#else
+            const juce::String arch = "x86";
+#endif
+#if JUCE_WINDOWS
+            const juce::String platform = "win-" + arch;
+#elif JUCE_MAC
+            const juce::String platform = "mac-" + arch;
+#elif JUCE_LINUX
+            const juce::String platform = "linux-" + arch;
+#else
+            const juce::String platform = "unknown";
+#endif
+            entropy::network::CheckForUpdatesAsync(
+                "entropy",
+                juce::String(JucePlugin_VersionString),
+                platform,
+                [](const entropy::network::UpdateInfo& info)
+                {
+                    if (info.has_update)
+                        entropy::network::ShowUpdateDialog(info);
+                });
+        });
+    }
 }
 
 EntropyAudioProcessor::~EntropyAudioProcessor()
