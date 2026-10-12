@@ -3,9 +3,50 @@
 #include "network/UpdateChecker.h"
 #include <cmath>
 #include <charconv>
+#include <cerrno>
+#include <cstdlib>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 namespace
 {
+// macOS 的 libc++ 尚未实现浮点版 std::from_chars（重载为 deleted），
+// 因此编译期探测：可用则用 from_chars，否则退回 strtof（要求整段消费、无溢出）。
+template <typename T, typename = void>
+struct HasFloatFromChars : std::false_type {};
+template <typename T>
+struct HasFloatFromChars<T, decltype(void(std::from_chars(std::declval<const char*>(),
+                                                          std::declval<const char*>(),
+                                                          std::declval<T&>())))> : std::true_type {};
+
+template <typename T>
+bool parseStrictFloatImpl(const char* start, const char* end, T& out, std::true_type)
+{
+    const auto parsed = std::from_chars(start, end, out);
+    return parsed.ec == std::errc() && parsed.ptr == end;
+}
+
+template <typename T>
+bool parseStrictFloatImpl(const char* start, const char* end, T& out, std::false_type)
+{
+    if (start == nullptr || start == end)
+        return false;
+    const std::string text(start, static_cast<size_t>(end - start));
+    errno = 0;
+    char* parsedEnd = nullptr;
+    const float value = std::strtof(text.c_str(), &parsedEnd);
+    if (parsedEnd != text.c_str() + text.size() || errno == ERANGE)
+        return false;
+    out = value;
+    return true;
+}
+
+bool parseStrictFloat(const char* start, const char* end, float& out)
+{
+    return parseStrictFloatImpl(start, end, out, HasFloatFromChars<float>{});
+}
+
 thread_local const EntropyAudioProcessor* dateWriteOwner = nullptr;
 class DateWriteScope
 {
@@ -365,8 +406,7 @@ bool EntropyAudioProcessor::restoreState(const void* data, int size)
             const auto* start = number.toRawUTF8();
             const auto* end = start + number.getNumBytesAsUTF8();
             float value = 0.0f;
-            const auto parsed = std::from_chars(start, end, value);
-            if (number.isEmpty() || parsed.ec != std::errc() || parsed.ptr != end
+            if (number.isEmpty() || !parseStrictFloat(start, end, value)
                 || !std::isfinite(value) || value < 0.0f || value > 1.0f)
                 return false;
             restoredIntensity[static_cast<size_t>(i)] = value;
@@ -395,8 +435,7 @@ bool EntropyAudioProcessor::restoreState(const void* data, int size)
         const auto* start = number.toRawUTF8();
         const auto* end = start + number.getNumBytesAsUTF8();
         float value = 0.0f;
-        const auto parsed = std::from_chars(start, end, value);
-        if (number.isEmpty() || parsed.ec != std::errc() || parsed.ptr != end
+        if (number.isEmpty() || !parseStrictFloat(start, end, value)
             || !std::isfinite(value) || value < 0.0f || value > 1.0f)
             return false;
         restoredNoise = value;
@@ -415,9 +454,8 @@ bool EntropyAudioProcessor::restoreState(const void* data, int size)
             const auto* start = number.toRawUTF8();
             const auto* end = start + number.getNumBytesAsUTF8();
             float value = 0.0f;
-            const auto parsed = std::from_chars(start, end, value);
             const auto range = parameters.getParameter(id)->getNormalisableRange();
-            if (number.isEmpty() || parsed.ec != std::errc() || parsed.ptr != end || !std::isfinite(value)
+            if (number.isEmpty() || !parseStrictFloat(start, end, value) || !std::isfinite(value)
                 || value < range.start || value > range.end)
                 return false;
             if (!child.hasType("PARAM"))
