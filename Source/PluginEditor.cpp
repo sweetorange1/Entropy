@@ -45,6 +45,40 @@ const char* descriptorEffectTooltip(int carrier, int row) noexcept
     const int r = std::clamp(row, 0, 4);
     return tips[static_cast<size_t>(c * 5 + r)];
 }
+
+// 给定"未应用行强度"的原始配方，返回某行在满强度（系数=1）时的效果强度。
+// applyModuleIntensity 对所有行字段都是线性缩放，因此当前效果强度 = 此值 × 该行系数；
+// 拖动控制条时据此反算系数，使控制条直接代表效果强度（与年份/储存状态解耦）。
+float descriptorAmount(entropy::Carrier carrier, const entropy::Recipe& raw, int row) noexcept
+{
+    switch (row)
+    {
+        case 0:
+            // STREAM 的 BANDWIDTH 行控制低通并联混合系数 filterAmount，而非码率截止；
+            // 其余载体控制 cutoffHz（高频滚降）。
+            return carrier == entropy::Carrier::streaming
+                ? raw.filterAmount
+                : 1.0f - raw.cutoffHz / 20000.0f;
+        case 1:
+            if (carrier == entropy::Carrier::streaming)
+                return 1.0f - static_cast<float>(raw.bitrate) / 320.0f;
+            // PHASE 的走带抖动是微秒级（满强度约 0.013 ms），与 TAPE/VINYL 的
+            // 毫秒级 wow 量级不同，须用各自量级归一化，否则进度条近乎恒 0。
+            if (carrier == entropy::Carrier::optical)
+                return raw.flutterMs / 0.013f;
+            return (raw.wowMs + raw.flutterMs) / 2.6f;
+        case 2: return (raw.eventRate + raw.gapRate) / 65.0f;
+        case 3:
+            return carrier == entropy::Carrier::optical
+                ? static_cast<float>(raw.correctionStage) / 3.0f
+                : 1.0f - raw.width;
+        case 4:
+            return carrier == entropy::Carrier::streaming
+                ? raw.smear
+                : raw.noise / entropy::surfaceNoiseMax(carrier);
+        default: return 0.0f;
+    }
+}
 }
 
 using entropy::ui::ink;
@@ -385,9 +419,17 @@ void EntropyAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
     if (!dragMoved)
         return;
     const auto c = processor.currentControls();
-    const float value = intensityFromBarPosition(p.x);
-    processor.setModuleIntensity(c.carrier, dragRow, value);
-    status = juce::String(moduleLabel(c.carrier, dragRow)) + "  " + juce::String(juce::roundToInt(value * 100.0f)) + " %";
+    const float target = intensityFromBarPosition(p.x);
+    // 解耦：拖动直接设定"效果强度"，反算行强度系数补偿当前年份/储存状态，
+    // 使控制条不再随其他控制器缩放；full 为满强度（系数=1）时的效果强度。
+    const auto carrier = static_cast<entropy::Carrier>(c.carrier);
+    const auto raw = entropy::makeRecipe(carrier, c.entropy, static_cast<float>(c.generations));
+    const float full = descriptorAmount(carrier, raw, dragRow);
+    const float coefficient = full > 0.0005f ? target / full : target;
+    processor.setModuleIntensity(c.carrier, dragRow, coefficient);
+    // 实际达到的效果强度受满强度上限约束（系数被 clamp 到 0–1）。
+    const float actual = full > 0.0005f ? juce::jmin(full, target) : 0.0f;
+    status = juce::String(moduleLabel(c.carrier, dragRow)) + "  " + juce::String(juce::roundToInt(actual * 100.0f)) + " %";
     statusTicks = 20;
     repaint();
 }
@@ -1036,6 +1078,9 @@ void EntropyAudioProcessorEditor::drawDescriptors(juce::Graphics& g, const entro
         rows[2].icon = DescriptorIcon::dropout;
     if (c.carrier == 2)
     {
+        // STREAM 的 BANDWIDTH 行是低通并联混合系数，须与 BITRATE 行的码率截止独立显示。
+        rows[0] = { "BANDWIDTH", juce::String(display.filterAmount * 100.0f, 0) + " %",
+                    display.filterAmount, DescriptorIcon::bandwidth };
         const bool lossless = c.entropy < 0.001f || levels[1] <= 0.001f;
         rows[1] = { "BITRATE MODEL", lossless ? "LOSSLESS" : juce::String(r.bitrate) + " kb/s",
                     levels[1] * (1.0f - static_cast<float>(r.bitrate) / 320.0f), DescriptorIcon::bitrate };
@@ -1043,6 +1088,9 @@ void EntropyAudioProcessorEditor::drawDescriptors(juce::Graphics& g, const entro
     }
     if (c.carrier == 3)
     {
+        // PHASE 的走带抖动是微秒级，用其自身量级（满强度 0.013 ms）归一化。
+        rows[1] = { "TRANSPORT", juce::String(display.flutterMs, 3) + " ms",
+                    display.flutterMs / 0.013f, DescriptorIcon::transport };
         constexpr std::array<const char*, 4> stages { "CORRECTABLE", "INTERPOLATION", "BIRDIES", "ERROR STORM" };
         rows[3] = { "MISCORRECTION", stages[static_cast<size_t>(r.correctionStage)],
                     levels[3] * static_cast<float>(r.correctionStage) / 3.0f, DescriptorIcon::birdie };
@@ -1071,7 +1119,7 @@ void EntropyAudioProcessorEditor::drawDescriptors(juce::Graphics& g, const entro
         g.fillRect(696.0f, y + 42.0f, 232.0f, 2.0f);
         g.setColour(active ? accent.withAlpha(0.7f) : juce::Colour(0xffc2c4bf));
         g.fillRect(696.0f, y + 42.0f, 232.0f * juce::jlimit(0.0f, 1.0f, row.amount), 2.0f);
-        const float handleX = 696.0f + 232.0f * juce::jlimit(0.0f, 1.0f, levels[static_cast<size_t>(i)]);
+        const float handleX = 696.0f + 232.0f * juce::jlimit(0.0f, 1.0f, row.amount);
         g.setColour((descriptorHover == i || dragged) ? accent : accent.withAlpha(0.45f));
         g.fillRect(handleX - 1.0f, y + 37.0f, 2.0f, 12.0f);
     }

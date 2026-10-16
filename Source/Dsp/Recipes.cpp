@@ -156,6 +156,8 @@ Recipe makeRecipe(Carrier carrier, float value, float generations) noexcept
             r.noise = 0.020f * onset(e, 0.30f) * (1.0f + 1.5f * s);
             r.eventRate = (0.6f * e + 70.0f * e * e) * (1.0f + 1.2f * s);
             r.eventLevel = 0.10f + 0.08f * e;
+            // 唱针/音槽磨损 → 声道串扰 → 声场收窄（比磁带方位角漂移温和）。
+            r.width = 1.0f - 0.45f * onset(e, 0.35f);
             break;
         }
         case Carrier::streaming:

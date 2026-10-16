@@ -478,6 +478,23 @@ void moduleBypassTests()
     require(processor.isModuleBypassed(carrierNow, 0) && std::abs(processor.moduleIntensityValue(carrierNow, 0) - draggedIntensity) < 0.000001f,
             "Click after drag did not toggle bypass or changed intensity");
     click(700, 220);
+    // 解耦验证：非零熵下，拖动控制条直接设定"效果强度"（反算系数补偿年份/储存状态）；
+    // 修改年份/储存状态只重算效果强度（UI 层随配方重新同步），不改内部系数。
+    {
+        processor.setParameter(entropy::ids::entropy, 0.6f);
+        const auto raw = entropy::makeRecipe(entropy::Carrier::tape, 0.6f, 1.0f);
+        const float full = 1.0f - raw.cutoffHz / 20000.0f;   // BANDWIDTH 满强度效果
+        require(full > 0.1f, "Decoupling test needs a non-trivial full amount");
+        const float target = 0.4f;
+        drag(700.0f, 696.0f + 232.0f * target);
+        const float expected = target / full;
+        require(std::abs(processor.moduleIntensityValue(carrierNow, 0) - expected) < 0.001f,
+                "Descriptor drag must set effect strength directly (target / full)");
+        const float coeffBefore = processor.moduleIntensityValue(carrierNow, 0);
+        processor.setParameter(entropy::ids::generations, 8.0f);
+        require(std::abs(processor.moduleIntensityValue(carrierNow, 0) - coeffBefore) < 0.000001f,
+                "Changing storage must re-sync effect strength without altering the coefficient");
+    }
     processor.setModuleIntensity(1, 3, 0.25f);
     processor.setModuleIntensity(3, 4, 0.0f);
     juce::MemoryBlock intensitySaved;

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.5-2A2A28" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.0.6-2A2A28" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/framework-JUCE%208.0.12-orange" alt="JUCE">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License">

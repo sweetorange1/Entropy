@@ -2,8 +2,8 @@
 
 > 面向作者、AI 助手和维护者：集中说明“现在做到了什么、参数叫什么、声音如何产生、下一步改哪里”。
 > 本文以当前源码为准，不把灵感文档里的目标功能当作已实现功能。
-> 对应版本：**1.0.5**；更新日期：**2026-10-10**；工程：`I:\理科系列\Entropy`。
-> 本版核心变化：接入遥测与更新推送——参考 Organic Chemistry 加入 `iisaac::telemetry` 遥测会话（Editor 创建后每日一次 `ui_open_daily` 上报）与 `entropy::network` 更新检查（Processor 启动 5 秒后异步 GET `iisaacbeats.cn/api/update/check`，有新版本弹窗提示下载）。详见 §8.1 与 §9.3。
+> 对应版本：**1.0.6**；更新日期：**2026-10-16**；工程：`i:\ChemEPlugins\Entropy`。
+> 本版核心变化：效果控制条解耦 + 三处显示/映射修复——右侧五行的强度手柄从"内部强度系数"改为"效果强度"（拖动直接设定效果强度、反算系数，改年份/储存状态后重新同步）；并修复 STREAM 的 BANDWIDTH 误绑码率截止、PHASE 的 TRANSPORT 归一化量级错误、VINYL 缺立体声退化三处缺陷。详见 §6.3、§6.4 与 §9.3。
 > 上版核心变化（1.0.0）：物理化学公式层上线——时间轴标注 σ = dS/dt ≥ 0；右上角融合 Gibbs–Helmholtz 签名公式与随拖动实时计算的 ΔG = ΔH − T·ΔS（T = 298 K 室温锚点，ΔG 在熵 0.5 过零并显示 SPONTANEOUS）；模型视图标题 S = k ln W 与微观状态计数 W ≈ 10^23·S；卡片底部 Arrhenius 速率方程与每载体 Ea、t½（等于时间尺度）；SURFACE 行标注 dS ≥ δQ/T。常数见 `Source/Thermodynamics.h`（艺术标定，t½ 与 ΔG 过零点自洽）。
 > 后续提出需求时，推荐使用“**载体 + 参数字段 + 想要的听感/数值变化**”，例如“让 TAPE 的 `wowMs` 在熵 0.4 后才开始增加”。
 
@@ -39,7 +39,7 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 产品名 / CMake 主目标 | `ChemE-Entropy`（自 1.0.1 起加系列前缀；CMake target 仍为 `Entropy`，产物目录 `Entropy_artefacts` 不变） |
-| 版本 | `1.0.5`，来自 `CMakeLists.txt` 的 `project()` |
+| 版本 | `1.0.6`，来自 `CMakeLists.txt` 的 `project()` |
 | 厂商 | `iisaacbeats.cn` |
 | Manufacturer Code / Plugin Code | `Isac` / `CE02`（旧为 `Entr`；更换后 VST3 UID 不同，新旧插件在宿主中共存，不覆盖旧安装） |
 | Bundle ID | `cn.iisaacbeats.ChemEEntropy`（旧为 `cn.iisaacbeats.Entropy`） |
@@ -213,9 +213,10 @@ x=\operatorname{clamp}\left(\frac{e-a}{1-a},0,1\right),\qquad O_a=x^2(3-2x)
 | `noise` | \(0.020O_{0.30}\) | 0.020 |
 | `eventRate` | \(0.6e+70e^2\) | 70.6 /s |
 | `eventLevel` | \(0.10+0.08e\) | 0.18 |
+| `width` | \(1-0.45O_{0.35}\) | 0.55 |
 
 - click 和 crackle 目前由同一个短脉冲事件模型产生；**密度随熵快速上升（0.6e+70e²），幅度基本恒定（0.10–0.18）**，符合“灰尘变多、单颗粒响度不变”的物理直觉。爆音不随 SURFACE 行强度缩放（仅随输入尾音淡出），SURFACE 行只控制 hiss/dust 噪声床。没有独立 click/pop/crackle 三套参数。
-- 这里没有 `gapRate`、独立 scratch、rumble、内圈位置或跳针实现；`width` 保持 1。储存环境 \(s\) 使 `wowMs` 乘 \(1+0.4s\)（翘曲）、`noise` 乘 \(1+1.5s\)（灰尘霉变）、`eventRate` 乘 \(1+1.2s\)（爆音频率）。
+- 这里没有 `gapRate`、独立 scratch、rumble、内圈位置或跳针实现；`width` 随熵收窄（唱针/音槽磨损 → 声道串扰）。储存环境 \(s\) 使 `wowMs` 乘 \(1+0.4s\)（翘曲）、`noise` 乘 \(1+1.5s\)（灰尘霉变）、`eventRate` 乘 \(1+1.2s\)（爆音频率）。
 
 ### 4.4 STREAM：码率阶梯与代际损失
 
@@ -347,7 +348,7 @@ y_p=((1-m)dG_i+mw)G_o,\qquad y=(1-b)y_p+bd
 | 热力学公式层 | 五处纯展示公式（斜体，`Source/Thermodynamics.h` 艺术标定）：① 时间轴右端 `σ = dS/dt ≥ 0`；② 右上签名 `∂(ΔG/T)/∂T = −ΔH/T²` 与活公式 `ΔG = ΔH − T·ΔS`（T = 298 K 室温常数，ΔS 来自时间轴，ΔG 在熵 0.5 过零，过零后左上显示 `SPONTANEOUS`）；③ 模型视图标题 `S = k ln W` 与 `W ≈ 10^(23·S)` 微观状态计数；④ 卡片底部 `k = A·e^(−Ea/RT)` 及每载体 `Ea`、`t½`（恰等于该载体时间尺度）；⑤ SURFACE 行 `dS ≥ δQ/T`（噪声床 = 热流）。公式字符串必须经 `juce::String::fromUTF8`，字体用含 ∂Δσδ≥≈²·½ 字形的默认 UI 斜体 |
 | 日期显示 | 右上（`CARRIER DATE / LOCAL TIME` 下方）显示选定日期，NOW 行显示当前时钟，统一为英文 `DD Mon YYYY HH:MM:SS`；双击右上日期可直接按原显示格式精确编辑，兼容 ISO/旧中文输入，Enter 提交、Esc 取消 |
 | 时间轴快捷输入 | 双击时间轴或按 Enter 弹出 0–100 数值框（0 = 现在/最右，100 = 最古老/混乱最高），输入数字即按时间尺度换算为日期；越界钳制到 0–100，非法文本取消；点击别处提交、Esc 取消 |
-| 右侧数值区 | 标签、突出数值、几何图标和细进度线；图标表达带宽/波动/断裂/声场/噪声等意义；细线上有强度手柄，**按住拖动即可设置该行强度（0–100%）** |
+| 右侧数值区 | 标签、突出数值、几何图标和细进度线；图标表达带宽/波动/断裂/声场/噪声等意义；细线上有强度手柄，**按住拖动即可直接设置该行效果强度（0–100%）** |
 | INPUT / MIX / OUTPUT | 旋钮样式与 Organic Chemistry 反应剖面（ADSR）控制器同款：5 段仪表刻度、强调色值弧、浅色主体与同色指针；纵向拖动，向上增大；双击打开自绘白色圆角数值框，dB 与百分比独立换算、框旁显示单位；回车/点击别处提交，Esc 取消；滚轮禁用 |
 | STORE / GEN | 四载体均显示；点击 1→2→…→8→1；STREAM 显示 `GEN 01–08`（转码代数），其余显示 `环境名 x/8`（TAPE：VAULT / CLIMATE / CABINET / DRAWER / ATTIC / GARAGE / BASEMENT / MAGNET；VINYL：RACK / SLEEVE / PAPER / STACKED / ATTIC / GARAGE / DAMP / SUN；PHASE：CASE / CABINET / DESK / LOOSE / SILL / CAR / DAMP / SUN）；不通过载体切换清零 |
 | IN / OUT | 输入 trim 前 / 最终输出后的采样峰值，合并声道；不是 RMS、LUFS 或 true peak |
@@ -359,12 +360,14 @@ UI 以 **30 Hz** 刷新。旋钮全量程拖动距离约 `160 × uiScale` 像素
 
 ### 6.2 右侧描述符：显示名到字段
 
-入口：`drawDescriptors()`。它从当前用户参数重新调用 `makeRecipe()`，再对显示副本调用 `applyModuleIntensity()` 乘各行强度，展示的是**强度缩放后的目标配方**，不是引擎平滑后的实时系数或音频测量。条形最终限制到 0–1；条上的竖手柄表示该行强度位置。
+入口：`drawDescriptors()`。它从当前用户参数重新调用 `makeRecipe()`，再对显示副本调用 `applyModuleIntensity()` 乘各行强度，展示的是**强度缩放后的目标配方**，不是引擎平滑后的实时系数或音频测量。条形最终限制到 0–1；条上的竖手柄表示该行**效果强度**位置（与进度条同长，不再显示内部系数）。
 
 | 显示名 | 模式 | 文字来源 | 条形含义 |
 | --- | --- | --- | --- |
-| BANDWIDTH | 全部 | `cutoffHz / 1000` kHz（已乘强度） | `1 - cutoffHz / 20000` |
-| TRANSPORT | 除 STREAM 外 | `wowMs + flutterMs` ms（已乘强度），不包含 `driftMs` | 上述和除以 2.6 |
+| BANDWIDTH | 除 STREAM 外 | `cutoffHz / 1000` kHz（已乘强度） | `1 - cutoffHz / 20000` |
+| BANDWIDTH | STREAM | `filterAmount × 100` %（低通并联混合系数，已乘强度） | `filterAmount` |
+| TRANSPORT | TAPE / VINYL | `wowMs + flutterMs` ms（已乘强度），不包含 `driftMs` | 上述和除以 2.6 |
+| TRANSPORT | PHASE | `flutterMs` ms（3 位小数，已乘强度） | `flutterMs / 0.013`（自身量级归一化） |
 | BITRATE MODEL | STREAM | `bitrate` kb/s；Entropy < 0.001 或强度 0 显示 LOSSLESS | `强度 × (1 - bitrate / 320)` |
 | DISCONTINUITIES | 全部 | `eventRate + gapRate` /s（已乘强度） | 上述和除以 65；不是实际发生次数 |
 | STEREO ORDER | 除 PHASE 外 | `width × 100` %（已乘强度） | `1 - width`；数字越低，退化条越长 |
@@ -392,10 +395,10 @@ UI 以 **30 Hz** 刷新。旋钮全量程拖动距离约 `160 × uiScale` 像素
 
 ### 6.3 模块旁路（点击描述符行）
 
-每行同时支持两种交互：**按住拖动强度条**（竖手柄或细线区域）设置该行强度 0–100%，0 表示该退化完全移除、100% 表示按时间轴满强度，中间值线性缩放；**单击（未拖动）切换旁路**，旁路后图标变灰、数值显示 `OFF`、进度条变灰，再点恢复。拖动与点击的区分在 `mouseUp()` 中按位移阈值（约 4 缩放像素）判定。
+每行同时支持两种交互：**按住拖动强度条**（竖手柄或细线区域）直接设置该行**效果强度** 0–100%（0 = 该退化完全移除，100% = 当前年份/储存状态下该行的最大效果强度）；拖动时反算内部行强度系数 `moduleIntensity = 目标强度 ÷ 满强度效果`（满强度效果由 `descriptorAmount()` 从当前配方算出），从而**与其他控制器解耦**——控制条直接决定效果强度、不再随年份/储存状态缩放；修改年份或储存状态后，效果强度随配方重新计算、控制条同步覆盖（内部系数不变）。**单击（未拖动）切换旁路**，旁路后图标变灰、数值显示 `OFF`、进度条变灰，再点恢复。拖动与点击的区分在 `mouseUp()` 中按位移阈值（约 4 缩放像素）判定。
 
 - 强度真源为 `EntropyAudioProcessor::moduleIntensity`（20 个无锁原子，索引 `carrier × 5 + row`），默认 SURFACE 行 0.6、其余 1.0；不是宿主参数，随状态保存，约 40 ms 平滑生效。配方刷新时 `EntropyEngine::process()` 先对每路配方调用 `Recipes.cpp::applyModuleIntensity()`（字段线性缩放；`width` 按 `1 + (width - 1) × 强度` 插值；`cutoffHz` 从 20 kHz 向配方值插值），再调用 `applyModuleBypass()` 归零旁路字段。
-- 旁路掩码真源为 `EntropyAudioProcessor::moduleBypass`（20 位原子），音频线程每个块读一次。全部五行旁路后，各载体还原为接近熵 0 的干净配方（黑胶的 STEREO ORDER 恒为 100%，旁路它无可闻变化）。
+- 旁路掩码真源为 `EntropyAudioProcessor::moduleBypass`（20 位原子），音频线程每个块读一次。全部五行旁路后，各载体还原为接近熵 0 的干净配方。
 
 | 行 | TAPE | VINYL | STREAM | PHASE |
 | --- | --- | --- | --- | --- |
@@ -418,7 +421,7 @@ UI 以 **30 Hz** 刷新。旋钮全量程拖动距离约 `160 × uiScale` 像素
 | 0 BANDWIDTH 带宽 | 磁畴退磁导致短波长（高频）先失稳：低通滚降 + 磁带饱和谐波（`cutoffHz`/`filterAmount`/`saturation`） | 纹路与内圈磨损：高频衰减 + 内圈奇次失真（同上） | 有损编码丢弃高频：低通并联混合（`filterAmount`） | 介质氧化/误读让高频先糊（`cutoffHz`/`filterAmount`） |
 | 1 TRANSPORT 走带 / BITRATE 码率 | 带速不稳：wow（0.83/1.37 Hz）+ flutter（27.3 Hz）+ 声道方位漂移（`wowMs`/`flutterMs`/`driftMs`） | 盘面偏心/翘曲：0.55 Hz 音高慢摆（`wowMs`） | 码率阶梯：Entropy 派生 320→64 kb/s 的砖墙截止（`cutoffHz` 档位） | 采样时钟抖动：逐样本随机时基（`flutterMs` 用随机值） |
 | 2 DISCONTINUITIES 断续 | dropout：磁粉脱落使信号瞬间陷落，随时间频率变高、单次陷落短暂（`gapRate`↑ / `gapDepth`≈0.72 / `gapMs`≈38ms），外加 print-through 后回声（`echo`） | **灰尘/划痕撞击产生的 click/crackle 爆音**：存放越久灰尘越多，爆音**频率**显著上升（`eventRate` 至约 70/s），单次爆音幅度基本恒定（`eventLevel` 0.10→0.18，不随 SURFACE 行缩放）；它是音频自身的表面撞击效果，不是 noise | 丢包/缓冲欠载：随机静音陷落（`gap*`） | 插值咔哒 + 静音/跳读陷落（`event*` + `gap*`） |
-| 3 STEREO ORDER 声场 / MISCORRECTION 误纠 | 磁头方位角误差让定位漂移：声场收窄（`width`） | 无立体声退化，恒为 100%（行存在但旁路无可闻变化） | 低码率声道合并：声场收窄（`width`） | **误纠鸟鸣 birdie**：光盘长期存放后反射层氧化/染料退化，CIRC 把读错数据“纠正”成错误值，产生短促扫频哨音（8–24ms，约 1.2–8.4kHz 扫频）；随时间增长的是**鸟鸣频率**（`birdieRate` 至约 7/s），不再静音 |
+| 3 STEREO ORDER 声场 / MISCORRECTION 误纠 | 磁头方位角误差让定位漂移：声场收窄（`width`） | 唱针/音槽磨损 → 声道串扰：声场收窄（`width`） | 低码率声道合并：声场收窄（`width`） | **误纠鸟鸣 birdie**：光盘长期存放后反射层氧化/染料退化，CIRC 把读错数据“纠正”成错误值，产生短促扫频哨音（8–24ms，约 1.2–8.4kHz 扫频）；随时间增长的是**鸟鸣频率**（`birdieRate` 至约 7/s），不再静音 |
 | 4 SURFACE RESIDUE 表面残留 / SMEAR 涂抹 | 带基 hiss 底噪（`noise`） | **静置/存放产生的灰尘底噪 hiss/dust**（`noise`），随 SURFACE 行强度缩放（默认 60%），与第 2 行的突发 click（不随该行）区分 | 编码预回声：瞬态前 smear + 金属残留（`smear`/`residue`） | 反复擦写后的噪声底抬升（`noise`） |
 
 > 黑胶的“灰尘”在界面分两处：持续的灰尘底噪属于第 4 行 SURFACE RESIDUE（HISS / DUST）；灰尘颗粒撞击针尖产生的突发 click/crackle 属于第 2 行 DISCONTINUITIES。二者旁路互不影响。
@@ -612,6 +615,8 @@ Processor 用原子最大值累积 UI 两次读取之间的峰值；UI 通过 `e
 **1.0.3 / 1.0.4**：VINYL 音槽弧带两轮迭代——1.0.3 尝试同心圆弧（圆心近、上长下短），小半径下弧带收缩成拱顶团块，弃用；1.0.4 改为**透视音槽带**（真实唱片照片中同心音槽的低视角形态）：五条弧各自参数化（半径 380→132、矢高 55→12），上方弧更长更平缓、下方弧更短更弯，跨度 392/321/252/183/109 设计像素逐级收窄；截图已检查，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
 
 **1.0.4 同日后续修订（强调色饱和度）**：`carrierColour` 四载体强调色整体提升饱和度，参考 Organic Chemistry 的 CPK 元素配色让白底上的彩色更鲜明——TAPE `#af614c→#b05a44`、VINYL `#687b54→#6e9a52`、STREAM `#2a6fb0→#3a78c2`、PHASE `#807396→#8764a6`，色相不变。该函数是界面所有载体彩色的单一来源，故按钮、时间轴、旋钮、粒子动画、载体图标与描述符区同步生效。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
+
+**1.0.6（效果控制条解耦 + 三处显示/映射修复）**：① 解耦——右侧五行强度手柄从"内部强度系数"改为"效果强度"：拖动直接设定该行效果强度（反算系数 `moduleIntensity = 目标强度 ÷ 满强度效果`，`descriptorAmount()` 从当前配方计算满强度效果），改年份/储存状态后效果强度随配方重新计算、手柄同步覆盖、系数不变；新增 `StateTests` 解耦回归（非零熵拖动 `moduleIntensity == 目标 ÷ 满强度`、改储存状态不改系数）。② STREAM 的 BANDWIDTH 行原误绑 `cutoffHz`（被 BITRATE 行控制、无法独立），改为低通并联混合系数 `filterAmount`（数值显示混合百分比），两行独立可控。③ PHASE 的 TRANSPORT 原沿用 TAPE 量级归一化（÷2.6）致进度条近乎恒 0，改用自身量级 `flutterMs / 0.013`（数值 3 位小数）。④ VINYL 原无立体声退化（`width` 恒 1、STEREO ORDER 不可调），新增 `width = 1 − 0.45·onset(e, 0.35)`（唱针/音槽磨损 → 声道串扰，满熵声场收窄至 55%）。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
 
 **1.0.5（接入遥测与更新推送）**：参考 Organic Chemistry，新增 `Source/shared/IisaacTelemetry.h`（遥测会话，`iisaac::telemetry::Session`，Editor 创建、析构释放，每日最多一次 `ui_open_daily` 上报到 `iisaacbeats.cn/api/telemetry/ping`，本地状态存用户目录 `iisaacbeats/Telemetry/entropy.xml`）与 `Source/network/UpdateChecker.{h,cpp}`、`Version.{h,cpp}`、`Source/UI/UpdateDialog.{h,cpp}`（启动 5 秒后异步 GET `iisaacbeats.cn/api/update/check?product=entropy&version=…&platform=…`，进程级去重、5 秒超时、失败静默；有新版本弹窗 `Download` / `Remind Me Later`）。测试实例（`clockForTesting != nullptr`）跳过更新检查；环境变量 `ENTROPY_UPDATE_CHECK_DISABLED=1` 或 `IISAAC_TELEMETRY_DISABLED=1` 可分别关闭。构建 `BUILD_OK`，`EntropyDSPTests` 与 `EntropyStateTests` 通过。
 
