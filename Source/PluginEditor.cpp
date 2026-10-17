@@ -962,8 +962,8 @@ void EntropyAudioProcessorEditor::drawDescriptorIcon(juce::Graphics& g, Descript
             for (float y = 8; y < 25; y += 5)
                 g.drawLine(16, y, 16, y + 2.5f, 1.0f);
             g.setColour(colour(alpha));
-            g.fillEllipse(11.0f - offset - 2.5f, 11, 5, 5);
-            g.fillEllipse(11.0f + offset - 2.5f, 11, 5, 5);
+            g.fillEllipse(16.0f - offset - 2.5f, 11, 5, 5);
+            g.fillEllipse(16.0f + offset - 2.5f, 11, 5, 5);
             break;
         }
         case DescriptorIcon::surface:
